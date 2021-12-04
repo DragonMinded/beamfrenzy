@@ -1,0 +1,4 @@
+*.swp
+beamfrenzy.bin
+build/
+romfs/

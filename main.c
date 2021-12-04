@@ -163,13 +163,13 @@ typedef struct
 #define PIPE_CONN_S 0x4
 #define PIPE_CONN_W 0x8
 
-#define BLOCK_WIDTH 16
-#define BLOCK_HEIGHT 16
+#define BLOCK_WIDTH 32
+#define BLOCK_HEIGHT 32
 
-#define CURSOR_WIDTH 32
-#define CURSOR_HEIGHT 32
-#define CURSOR_OFFSET_X -8
-#define CURSOR_OFFSET_Y -8
+#define CURSOR_WIDTH 64
+#define CURSOR_HEIGHT 64
+#define CURSOR_OFFSET_X -16
+#define CURSOR_OFFSET_Y -16
 
 void *cursor = 0;
 
@@ -229,6 +229,13 @@ void playfield_draw(int x, int y, playfield_t *playfield)
         y,
         x + (BLOCK_WIDTH * (playfield->width + 1)) + (PLAYFIELD_BORDER - 1),
         y + (BLOCK_HEIGHT * playfield->height) + ((PLAYFIELD_BORDER * 2) - 1),
+        rgb(255, 255, 255)
+    );
+    video_draw_box(
+        x + BLOCK_WIDTH - PLAYFIELD_BORDER - 1,
+        y - 1,
+        x + (BLOCK_WIDTH * (playfield->width + 1)) + PLAYFIELD_BORDER,
+        y + (BLOCK_HEIGHT * playfield->height) + (PLAYFIELD_BORDER * 2),
         rgb(255, 255, 255)
     );
 
@@ -824,8 +831,8 @@ void playfield_apply_gravity(playfield_t *playfield)
     playfield_check_connections(playfield);
 }
 
-#define PLAYFIELD_WIDTH 17
-#define PLAYFIELD_HEIGHT 24
+#define PLAYFIELD_WIDTH 9
+#define PLAYFIELD_HEIGHT 12
 
 void main()
 {
@@ -891,7 +898,7 @@ void main()
     {
         for (int x = 0; x < PLAYFIELD_WIDTH; x++)
         {
-            playfield_generate_block(playfield, x, y, 0.5);
+            playfield_generate_block(playfield, x, y, 0.75);
         }
     }
     playfield_apply_gravity(playfield);

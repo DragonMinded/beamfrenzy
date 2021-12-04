@@ -21,13 +21,19 @@ build/romfs.bin: romfs/ ${ROMFSGEN_FILE} ${IMG2BIN_FILE}
 	mkdir -p romfs/
 	mkdir -p romfs/sprites/
 	${IMG2BIN} romfs/sprites/purpleblock assets/sprites/purpleblock.png --depth 16
-	${IMG2BIN} romfs/sprites/straightpipe assets/sprites/straightpipe.png --depth 16
-	${IMG2BIN} romfs/sprites/cornerpipe assets/sprites/cornerpipe.png --depth 16
 	${IMG2BIN} romfs/sprites/source assets/sprites/source.png --depth 16
 	${IMG2BIN} romfs/sprites/red assets/sprites/red.png --depth 16
 	${IMG2BIN} romfs/sprites/green assets/sprites/green.png --depth 16
 	${IMG2BIN} romfs/sprites/blue assets/sprites/blue.png --depth 16
 	${IMG2BIN} romfs/sprites/cursor assets/sprites/cursor.png --depth 16
+	${IMG2BIN} romfs/sprites/straightpipe assets/sprites/straightpipe.png --depth 16
+	${IMG2BIN} romfs/sprites/straightred assets/sprites/straightred.png --depth 16
+	${IMG2BIN} romfs/sprites/straightgreen assets/sprites/straightgreen.png --depth 16
+	${IMG2BIN} romfs/sprites/straightblue assets/sprites/straightblue.png --depth 16
+	${IMG2BIN} romfs/sprites/cornerpipe assets/sprites/cornerpipe.png --depth 16
+	${IMG2BIN} romfs/sprites/cornerblue assets/sprites/cornerblue.png --depth 16
+	${IMG2BIN} romfs/sprites/cornergreen assets/sprites/cornergreen.png --depth 16
+	${IMG2BIN} romfs/sprites/cornerred assets/sprites/cornerred.png --depth 16
 	${ROMFSGEN} $@ romfs/
 
 # Provide the top-level ROM creation target for this binary.

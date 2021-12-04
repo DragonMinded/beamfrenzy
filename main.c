@@ -131,6 +131,7 @@ typedef struct
     unsigned int block;
     unsigned int pipe;
     unsigned int color;
+    unsigned int age;
 } playfield_entry_t;
 
 typedef struct
@@ -557,17 +558,193 @@ void playfield_cursor_move(playfield_t *playfield, int direction)
     }
 }
 
+int playfield_touches_light(playfield_t *playfield, int x, int y, int in_direction, int color)
+{
+    // First, if this doesn't have a connection in the in direction, its always false.
+    playfield_entry_t *cur = playfield->entries + (y * playfield->width) + x;
+    if ((cur->pipe & in_direction) == 0)
+    {
+        return 0;
+    }
+
+    // Calculate the other direction of the pipe by removing the in direction.
+    unsigned int out_direction = cur->pipe & (~in_direction);
+    switch(out_direction)
+    {
+        case PIPE_CONN_N:
+        {
+            // Goes out north. Either it hits the sky or it goes to another block.
+            if (y == 0)
+            {
+                return 0;
+            }
+            else
+            {
+                return playfield_touches_light(playfield, x, y - 1, PIPE_CONN_S, color);
+            }
+        }
+        case PIPE_CONN_S:
+        {
+            // Goes out south. Either it hits a light block or it goes to another block.
+            if (y == playfield->height - 1)
+            {
+                source_entry_t *source = playfield->sources + (2 * playfield->height) + x;
+                return source->color == color;
+            }
+            else
+            {
+                return playfield_touches_light(playfield, x, y + 1, PIPE_CONN_N, color);
+            }
+        }
+        case PIPE_CONN_E:
+        {
+            // Goes out east. Either it hits a light block or it goes to another block.
+            if (x == playfield->width - 1)
+            {
+                source_entry_t *source = playfield->sources + playfield->height + y;
+                return source->color == color;
+            }
+            else
+            {
+                return playfield_touches_light(playfield, x + 1, y, PIPE_CONN_W, color);
+            }
+        }
+        case PIPE_CONN_W:
+        {
+            // Goes out west. Either it hits a light block or it goes to another block.
+            if (x == 0)
+            {
+                source_entry_t *source = playfield->sources + y;
+                return source->color == color;
+            }
+            else
+            {
+                return playfield_touches_light(playfield, x - 1, y, PIPE_CONN_E, color);
+            }
+        }
+    }
+
+    // If we get here, who knows why, but we don't have a connection.
+    return 0;
+}
+
+void playfield_fill_light(playfield_t *playfield, int x, int y, int in_direction, int color)
+{
+    // First, if this doesn't have a connection in the in direction, don't fill it.
+    playfield_entry_t *cur = playfield->entries + (y * playfield->width) + x;
+    if ((cur->pipe & in_direction) == 0)
+    {
+        return;
+    }
+
+    // Calculate the other direction of the pipe by removing the in direction.
+    unsigned int out_direction = cur->pipe & (~in_direction);
+    cur->color = color;
+    switch(out_direction)
+    {
+        case PIPE_CONN_N:
+        {
+            // Goes out north. Either it hits the sky or it goes to another block.
+            if (y > 0)
+            {
+                return playfield_fill_light(playfield, x, y - 1, PIPE_CONN_S, color);
+            }
+        }
+        case PIPE_CONN_S:
+        {
+            // Goes out south. Either it hits a light block or it goes to another block.
+            if (y < playfield->height - 1)
+            {
+                return playfield_fill_light(playfield, x, y + 1, PIPE_CONN_N, color);
+            }
+        }
+        case PIPE_CONN_E:
+        {
+            // Goes out east. Either it hits a light block or it goes to another block.
+            if (x < playfield->width - 1)
+            {
+                return playfield_fill_light(playfield, x + 1, y, PIPE_CONN_W, color);
+            }
+        }
+        case PIPE_CONN_W:
+        {
+            // Goes out west. Either it hits a light block or it goes to another block.
+            if (x > 0)
+            {
+                return playfield_fill_light(playfield, x - 1, y, PIPE_CONN_E, color);
+            }
+        }
+    }
+}
+
 void playfield_check_connections(playfield_t *playfield)
 {
+    // Keep track of what changed so we can reset countdowns.
+    playfield_entry_t *oldentries = malloc(sizeof(playfield_entry_t) * playfield->width * playfield->height);
+    memcpy(oldentries, playfield->entries, sizeof(playfield_entry_t) * playfield->width * playfield->height);
+
     for (int y = 0; y < playfield->height; y++)
     {
         for (int x = 0; x < playfield->width; x++)
         {
-            // TODO, turn off connections and then recalculate
+            // Turn off all connections and then recalculate.
             playfield_entry_t *cur = playfield->entries + (y * playfield->width) + x;
             cur->color = SOURCE_COLOR_NONE;
         }
     }
+
+    // Now, go through each light source and see if it connects to another of its color.
+    for (int lsy = 0; lsy < playfield->height; lsy++)
+    {
+        source_entry_t *source = playfield->sources + lsy;
+        if (source->color != SOURCE_COLOR_NONE)
+        {
+            if (playfield_touches_light(playfield, 0, lsy, PIPE_CONN_W, source->color))
+            {
+                playfield_fill_light(playfield, 0, lsy, PIPE_CONN_W, source->color);
+            }
+        }
+
+        source = playfield->sources + lsy + playfield->height;
+        if (source->color != SOURCE_COLOR_NONE)
+        {
+            if (playfield_touches_light(playfield, playfield->width - 1, lsy, PIPE_CONN_E, source->color))
+            {
+                playfield_fill_light(playfield, playfield->width - 1, lsy, PIPE_CONN_E, source->color);
+            }
+        }
+    }
+
+    for (int lsx = 0; lsx < playfield->width; lsx++)
+    {
+        source_entry_t *source = playfield->sources + (2 * playfield->height) + lsx;
+        if (source->color != SOURCE_COLOR_NONE)
+        {
+            if (playfield_touches_light(playfield, lsx, playfield->height - 1, PIPE_CONN_S, source->color))
+            {
+                playfield_fill_light(playfield, lsx, playfield->height - 1, PIPE_CONN_S, source->color);
+            }
+        }
+    }
+
+    // Now, for anything that changed, reset its age.
+    for (int y = 0; y < playfield->height; y++)
+    {
+        for (int x = 0; x < playfield->width; x++)
+        {
+            // Turn off all connections and then recalculate.
+            playfield_entry_t *cur = playfield->entries + (y * playfield->width) + x;
+            playfield_entry_t *old = oldentries + (y * playfield->width) + x;
+
+            if (cur->color != old->color)
+            {
+                cur->age = 0;
+            }
+        }
+    }
+
+    // Now that we don't need the old entries, free them.
+    free(oldentries);
 }
 
 #define CURSOR_ROTATE_LEFT 11

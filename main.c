@@ -126,6 +126,15 @@ void *sprite_dup_rotate_cw(void *sprite, int width, int height, int depth)
     }
 }
 
+// Core game rule adjustments.
+#define PLAYFIELD_WIDTH 9
+#define PLAYFIELD_HEIGHT 11
+
+int gamerule_gravity = 0;
+int gamerule_rotation = 0;
+int gamerule_dragging = 0;
+int gamerule_placing = 1;
+
 typedef struct
 {
     unsigned int block;
@@ -144,6 +153,8 @@ typedef struct
 #define SOURCE_COLOR_GREEN 0x2
 #define SOURCE_COLOR_BLUE 0x4
 
+#define UPNEXT_AMOUNT 5
+
 typedef struct
 {
     int width;
@@ -152,6 +163,7 @@ typedef struct
     int cury;
     playfield_entry_t *entries;
     source_entry_t *sources;
+    playfield_entry_t *upnext;
 } playfield_t;
 
 #define BLOCK_TYPE_NONE 0
@@ -287,7 +299,12 @@ void *white_w = 0;
 void playfield_metrics(playfield_t *playfield, int *width, int *height)
 {
     *width = (playfield->width + 2) * BLOCK_WIDTH;
-    *height = ((playfield->height + 1) * BLOCK_HEIGHT) + PLAYFIELD_BORDER;
+    *height = (playfield->height + 2) * BLOCK_HEIGHT;
+
+    if (gamerule_placing)
+    {
+        *width += BLOCK_WIDTH * 3;
+    }
 }
 
 playfield_entry_t *playfield_entry(playfield_t *playfield, int x, int y)
@@ -295,29 +312,330 @@ playfield_entry_t *playfield_entry(playfield_t *playfield, int x, int y)
     return playfield->entries + (y * playfield->width) + x;
 }
 
+void *playfield_block_sprite(playfield_entry_t *cur)
+{
+    switch(cur->block)
+    {
+        case BLOCK_TYPE_PURPLE:
+        {
+            return block_purple;
+            break;
+        }
+        case BLOCK_TYPE_ORANGE:
+        {
+            return block_orange;
+            break;
+        }
+        case BLOCK_TYPE_BLUE:
+        {
+            return block_blue;
+            break;
+        }
+        case BLOCK_TYPE_GREEN:
+        {
+            return block_green;
+            break;
+        }
+    }
+
+    return 0;
+}
+
+void *playfield_pipe_sprite(playfield_entry_t *cur)
+{
+    switch(cur->pipe)
+    {
+        case PIPE_CONN_E | PIPE_CONN_W:
+        {
+            return pipe_ew;
+        }
+        case PIPE_CONN_N | PIPE_CONN_S:
+        {
+            return pipe_ns;
+        }
+        case PIPE_CONN_N | PIPE_CONN_E:
+        {
+            return pipe_ne;
+        }
+        case PIPE_CONN_N | PIPE_CONN_W:
+        {
+            return pipe_nw;
+        }
+        case PIPE_CONN_S | PIPE_CONN_E:
+        {
+            return pipe_se;
+        }
+        case PIPE_CONN_S | PIPE_CONN_W:
+        {
+            return pipe_sw;
+        }
+    }
+
+    return 0;
+}
+
+void *playfield_color_sprite(playfield_entry_t *cur)
+{
+    switch(cur->pipe)
+    {
+        case PIPE_CONN_E | PIPE_CONN_W:
+        {
+            if (cur->color == SOURCE_COLOR_RED)
+            {
+                return red_ew;
+            }
+            if (cur->color == SOURCE_COLOR_GREEN)
+            {
+                return green_ew;
+            }
+            if (cur->color == SOURCE_COLOR_BLUE)
+            {
+                return blue_ew;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+            {
+                return magenta_ew;
+            }
+            if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return cyan_ew;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+            {
+                return yellow_ew;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return white_ew;
+            }
+            break;
+        }
+        case PIPE_CONN_N | PIPE_CONN_S:
+        {
+            if (cur->color == SOURCE_COLOR_RED)
+            {
+                return red_ns;
+            }
+            if (cur->color == SOURCE_COLOR_GREEN)
+            {
+                return green_ns;
+            }
+            if (cur->color == SOURCE_COLOR_BLUE)
+            {
+                return blue_ns;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+            {
+                return magenta_ns;
+            }
+            if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return cyan_ns;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+            {
+                return yellow_ns;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return white_ns;
+            }
+            break;
+        }
+        case PIPE_CONN_N | PIPE_CONN_E:
+        {
+            if (cur->color == SOURCE_COLOR_RED)
+            {
+                return red_ne;
+            }
+            if (cur->color == SOURCE_COLOR_GREEN)
+            {
+                return green_ne;
+            }
+            if (cur->color == SOURCE_COLOR_BLUE)
+            {
+                return blue_ne;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+            {
+                return magenta_ne;
+            }
+            if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return cyan_ne;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+            {
+                return yellow_ne;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return white_ne;
+            }
+            break;
+        }
+        case PIPE_CONN_N | PIPE_CONN_W:
+        {
+            if (cur->color == SOURCE_COLOR_RED)
+            {
+                return red_nw;
+            }
+            if (cur->color == SOURCE_COLOR_GREEN)
+            {
+                return green_nw;
+            }
+            if (cur->color == SOURCE_COLOR_BLUE)
+            {
+                return blue_nw;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+            {
+                return magenta_nw;
+            }
+            if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return cyan_nw;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+            {
+                return yellow_nw;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return white_nw;
+            }
+            break;
+        }
+        case PIPE_CONN_S | PIPE_CONN_E:
+        {
+            if (cur->color == SOURCE_COLOR_RED)
+            {
+                return red_se;
+            }
+            if (cur->color == SOURCE_COLOR_GREEN)
+            {
+                return green_se;
+            }
+            if (cur->color == SOURCE_COLOR_BLUE)
+            {
+                return blue_se;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+            {
+                return magenta_se;
+            }
+            if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return cyan_se;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+            {
+                return yellow_se;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return white_se;
+            }
+            break;
+        }
+        case PIPE_CONN_S | PIPE_CONN_W:
+        {
+            if (cur->color == SOURCE_COLOR_RED)
+            {
+                return red_sw;
+            }
+            if (cur->color == SOURCE_COLOR_GREEN)
+            {
+                return green_sw;
+            }
+            if (cur->color == SOURCE_COLOR_BLUE)
+            {
+                return blue_sw;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+            {
+                return magenta_sw;
+            }
+            if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return cyan_sw;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+            {
+                return yellow_sw;
+            }
+            if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+            {
+                return white_sw;
+            }
+            break;
+        }
+    }
+
+    return 0;
+}
+
 void playfield_draw(int x, int y, playfield_t *playfield)
 {
     video_draw_box(
         x + BLOCK_WIDTH - PLAYFIELD_BORDER,
-        y,
+        y + BLOCK_HEIGHT - PLAYFIELD_BORDER,
         x + (BLOCK_WIDTH * (playfield->width + 1)) + (PLAYFIELD_BORDER - 1),
-        y + (BLOCK_HEIGHT * playfield->height) + ((PLAYFIELD_BORDER * 2) - 1),
+        y + (BLOCK_HEIGHT * (playfield->height + 1)) + (PLAYFIELD_BORDER - 1),
         rgb(255, 255, 255)
     );
     video_draw_box(
         x + BLOCK_WIDTH - PLAYFIELD_BORDER - 1,
-        y - 1,
+        y + BLOCK_HEIGHT - PLAYFIELD_BORDER - 1,
         x + (BLOCK_WIDTH * (playfield->width + 1)) + PLAYFIELD_BORDER,
-        y + (BLOCK_HEIGHT * playfield->height) + (PLAYFIELD_BORDER * 2),
+        y + (BLOCK_HEIGHT * (playfield->height + 1)) + PLAYFIELD_BORDER,
         rgb(255, 255, 255)
     );
+
+    if (gamerule_placing)
+    {
+        video_draw_box(
+            x + (BLOCK_WIDTH * (playfield->width + 4)) - PLAYFIELD_BORDER,
+            y + BLOCK_HEIGHT - PLAYFIELD_BORDER,
+            x + (BLOCK_WIDTH * (playfield->width + 5)) + (PLAYFIELD_BORDER - 1),
+            y + BLOCK_HEIGHT * (1 + UPNEXT_AMOUNT) + (PLAYFIELD_BORDER - 1),
+            rgb(255, 255, 255)
+        );
+        video_draw_box(
+            x + (BLOCK_WIDTH * (playfield->width + 4)) - PLAYFIELD_BORDER - 1,
+            y + BLOCK_HEIGHT - PLAYFIELD_BORDER - 1,
+            x + (BLOCK_WIDTH * (playfield->width + 5)) + (PLAYFIELD_BORDER),
+            y + BLOCK_HEIGHT * (1 + UPNEXT_AMOUNT) + (PLAYFIELD_BORDER),
+            rgb(255, 255, 255)
+        );
+
+        for (int i = 0; i < UPNEXT_AMOUNT; i++)
+        {
+            playfield_entry_t *cur = &playfield->upnext[i];
+            void *blocksprite = playfield_block_sprite(cur);
+            void *pipesprite = playfield_pipe_sprite(cur);
+            int xloc = x + (BLOCK_WIDTH * (playfield->width + 4));
+            int yloc = y + (BLOCK_HEIGHT * (i + 1));
+
+            if (blocksprite != 0)
+            {
+                video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, blocksprite);
+
+                // Only draw pipes if there are blocks.
+                if (pipesprite != 0)
+                {
+                    video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, pipesprite);
+                }
+            }
+        }
+    }
 
     for (int pheight = -1; pheight <= playfield->height; pheight++)
     {
         for (int pwidth = -1; pwidth <= playfield->width; pwidth++)
         {
             int xloc = x + ((pwidth + 1) * BLOCK_WIDTH);
-            int yloc = y + (pheight * BLOCK_HEIGHT) + PLAYFIELD_BORDER;
+            int yloc = y + ((pheight + 1) * BLOCK_HEIGHT);
 
             // First, draw the blocks on the playfield.
             if (pheight >= 0 && pheight < playfield->height && pwidth >= 0 && pwidth < playfield->width)
@@ -325,242 +643,22 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                 playfield_entry_t *cur = playfield_entry(playfield, pwidth, pheight);
                 void *blocksprite = 0;
 
-                switch(cur->block)
+                // Handle displaying cursor ghost.
+                if (cur->block == BLOCK_TYPE_NONE)
                 {
-                    case BLOCK_TYPE_NONE:
-                    {
-                        break;
-                    }
-                    case BLOCK_TYPE_PURPLE:
-                    {
-                        blocksprite = block_purple;
-                        break;
-                    }
-                    case BLOCK_TYPE_ORANGE:
-                    {
-                        blocksprite = block_orange;
-                        break;
-                    }
-                    case BLOCK_TYPE_BLUE:
-                    {
-                        blocksprite = block_blue;
-                        break;
-                    }
-                    case BLOCK_TYPE_GREEN:
-                    {
-                        blocksprite = block_green;
-                        break;
-                    }
-                    case BLOCK_TYPE_GRAY:
+                    if (gamerule_placing && playfield->upnext->block != BLOCK_TYPE_NONE && playfield->curx == pwidth && playfield->cury == pheight)
                     {
                         blocksprite = block_gray;
-                        break;
+                        cur = playfield->upnext;
                     }
+                }
+                else
+                {
+                    blocksprite = playfield_block_sprite(cur);
                 }
 
-                void *pipesprite = 0;
-                void *colorsprite = 0;
-                switch(cur->pipe)
-                {
-                    case PIPE_CONN_E | PIPE_CONN_W:
-                    {
-                        pipesprite = pipe_ew;
-                        if (cur->color == SOURCE_COLOR_RED)
-                        {
-                            colorsprite = red_ew;
-                        }
-                        if (cur->color == SOURCE_COLOR_GREEN)
-                        {
-                            colorsprite = green_ew;
-                        }
-                        if (cur->color == SOURCE_COLOR_BLUE)
-                        {
-                            colorsprite = blue_ew;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = magenta_ew;
-                        }
-                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = cyan_ew;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
-                        {
-                            colorsprite = yellow_ew;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = white_ew;
-                        }
-                        break;
-                    }
-                    case PIPE_CONN_N | PIPE_CONN_S:
-                    {
-                        pipesprite = pipe_ns;
-                        if (cur->color == SOURCE_COLOR_RED)
-                        {
-                            colorsprite = red_ns;
-                        }
-                        if (cur->color == SOURCE_COLOR_GREEN)
-                        {
-                            colorsprite = green_ns;
-                        }
-                        if (cur->color == SOURCE_COLOR_BLUE)
-                        {
-                            colorsprite = blue_ns;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = magenta_ns;
-                        }
-                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = cyan_ns;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
-                        {
-                            colorsprite = yellow_ns;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = white_ns;
-                        }
-                        break;
-                    }
-                    case PIPE_CONN_N | PIPE_CONN_E:
-                    {
-                        pipesprite = pipe_ne;
-                        if (cur->color == SOURCE_COLOR_RED)
-                        {
-                            colorsprite = red_ne;
-                        }
-                        if (cur->color == SOURCE_COLOR_GREEN)
-                        {
-                            colorsprite = green_ne;
-                        }
-                        if (cur->color == SOURCE_COLOR_BLUE)
-                        {
-                            colorsprite = blue_ne;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = magenta_ne;
-                        }
-                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = cyan_ne;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
-                        {
-                            colorsprite = yellow_ne;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = white_ne;
-                        }
-                        break;
-                    }
-                    case PIPE_CONN_N | PIPE_CONN_W:
-                    {
-                        pipesprite = pipe_nw;
-                        if (cur->color == SOURCE_COLOR_RED)
-                        {
-                            colorsprite = red_nw;
-                        }
-                        if (cur->color == SOURCE_COLOR_GREEN)
-                        {
-                            colorsprite = green_nw;
-                        }
-                        if (cur->color == SOURCE_COLOR_BLUE)
-                        {
-                            colorsprite = blue_nw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = magenta_nw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = cyan_nw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
-                        {
-                            colorsprite = yellow_nw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = white_nw;
-                        }
-                        break;
-                    }
-                    case PIPE_CONN_S | PIPE_CONN_E:
-                    {
-                        pipesprite = pipe_se;
-                        if (cur->color == SOURCE_COLOR_RED)
-                        {
-                            colorsprite = red_se;
-                        }
-                        if (cur->color == SOURCE_COLOR_GREEN)
-                        {
-                            colorsprite = green_se;
-                        }
-                        if (cur->color == SOURCE_COLOR_BLUE)
-                        {
-                            colorsprite = blue_se;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = magenta_se;
-                        }
-                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = cyan_se;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
-                        {
-                            colorsprite = yellow_se;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = white_se;
-                        }
-                        break;
-                    }
-                    case PIPE_CONN_S | PIPE_CONN_W:
-                    {
-                        pipesprite = pipe_sw;
-                        if (cur->color == SOURCE_COLOR_RED)
-                        {
-                            colorsprite = red_sw;
-                        }
-                        if (cur->color == SOURCE_COLOR_GREEN)
-                        {
-                            colorsprite = green_sw;
-                        }
-                        if (cur->color == SOURCE_COLOR_BLUE)
-                        {
-                            colorsprite = blue_sw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = magenta_sw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = cyan_sw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
-                        {
-                            colorsprite = yellow_sw;
-                        }
-                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
-                        {
-                            colorsprite = white_sw;
-                        }
-                        break;
-                    }
-                }
+                void *pipesprite = playfield_pipe_sprite(cur);
+                void *colorsprite = playfield_color_sprite(cur);
 
                 if (blocksprite != 0)
                 {
@@ -734,6 +832,56 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                     }
                 }
             }
+            else if (pheight == -1)
+            {
+                if (pwidth >= 0 && pwidth < playfield->width)
+                {
+                    source = playfield->sources + (2 * playfield->height) + playfield->width + pwidth;
+                    sourcesprite = source_s;
+                    playfield_entry_t *adj = playfield_entry(playfield, pwidth, 0);
+                    if (adj->pipe & PIPE_CONN_N)
+                    {
+                        switch(adj->color)
+                        {
+                            case SOURCE_COLOR_RED:
+                            {
+                                pipecolorsprite = red_s;
+                                break;
+                            }
+                            case SOURCE_COLOR_GREEN:
+                            {
+                                pipecolorsprite = green_s;
+                                break;
+                            }
+                            case SOURCE_COLOR_BLUE:
+                            {
+                                pipecolorsprite = blue_s;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = magenta_s;
+                                break;
+                            }
+                            case (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = cyan_s;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN):
+                            {
+                                pipecolorsprite = yellow_s;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = white_s;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
 
             if (source != 0)
             {
@@ -800,17 +948,21 @@ playfield_t *playfield_new(int width, int height)
     playfield_entry_t *entries = malloc(sizeof(playfield_entry_t) * width * height);
     memset(entries, 0, sizeof(playfield_entry_t) * width * height);
 
-    source_entry_t *sources = malloc(sizeof(source_entry_t) * (width + (height * 2)));
-    memset(sources, 0, sizeof(source_entry_t) * (width + (height * 2)));
+    source_entry_t *sources = malloc(sizeof(source_entry_t) * ((width * 2) + (height * 2)));
+    memset(sources, 0, sizeof(source_entry_t) * ((width * 2) + (height * 2)));
+
+    playfield_entry_t *upnext = malloc(sizeof(playfield_entry_t) * UPNEXT_AMOUNT);
+    memset(upnext, 0, sizeof(playfield_entry_t) * UPNEXT_AMOUNT);
 
     playfield_t *playfield = malloc(sizeof(playfield_t));
     playfield->width = width;
     playfield->height = height;
     playfield->entries = entries;
     playfield->sources = sources;
+    playfield->upnext = upnext;
 
     playfield->curx = width / 2;
-    playfield->cury = height - 1;
+    playfield->cury = height / 2;
 
     return playfield;
 }
@@ -828,14 +980,33 @@ void playfield_generate_block(playfield_t *playfield, int x, int y, float block_
 
     if (chance() <= block_chance)
     {
+        // First handle the color chance (asthetic only).
         playfield_entry_t *cur = playfield_entry(playfield, x, y);
-        int color = (int)(chance() * 5.0) + 1;
+        int color = (int)(chance() * 4.0) + 1;
         cur->block = color;
 
-        if (chance() >= 0.05)
+        // Now handle the connections.
+        int corner = (int)(chance() * 4.0);
+        int second = (int)(chance() * 3.0);
+        cur->pipe = bits[corner] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
+    }
+}
+
+void playfield_generate_upnext(playfield_t *playfield)
+{
+    static unsigned int bits[4] = { PIPE_CONN_N, PIPE_CONN_E, PIPE_CONN_S, PIPE_CONN_W };
+
+    for (int i = 0; i < UPNEXT_AMOUNT; i++)
+    {
+        playfield_entry_t *cur = playfield->upnext + i;
+
+        if (cur->block == BLOCK_TYPE_NONE)
         {
+            int color = (int)(chance() * 4.0) + 1;
+            cur->block = color;
+
             int corner = (int)(chance() * 4.0);
-            int second = (int)(chance() * 3.0);
+            int second = (int)(chance() * 2.0);
 
             cur->pipe = bits[corner] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
         }
@@ -859,6 +1030,11 @@ void playfield_set_source(playfield_t *playfield, int x, int y, unsigned int col
         source_entry_t *cur = playfield->sources + (2 * playfield->height) + x;
         cur->color = color;
     }
+    else if (y == -1)
+    {
+        source_entry_t *cur = playfield->sources + (2 * playfield->height) + playfield->width + x;
+        cur->color = color;
+    }
 }
 
 int playfield_touches_light(playfield_t *playfield, int x, int y, int in_direction, int color)
@@ -879,7 +1055,8 @@ int playfield_touches_light(playfield_t *playfield, int x, int y, int in_directi
             // Goes out north. Either it hits the sky or it goes to another block.
             if (y == 0)
             {
-                return 0;
+                source_entry_t *source = playfield->sources + (2 * playfield->height) + playfield->width + x;
+                return (source->color & color) == color;
             }
             else
             {
@@ -1031,6 +1208,15 @@ void playfield_check_connections(playfield_t *playfield)
                 playfield_fill_light(playfield, lsx, playfield->height - 1, PIPE_CONN_S, source->color);
             }
         }
+
+        source = playfield->sources + (2 * playfield->height) + playfield->width + lsx;
+        if (source->color != SOURCE_COLOR_NONE)
+        {
+            if (playfield_touches_light(playfield, lsx, 0, PIPE_CONN_N, source->color))
+            {
+                playfield_fill_light(playfield, lsx, 0, PIPE_CONN_N, source->color);
+            }
+        }
     }
 
     // Now, for anything that changed, reset its age.
@@ -1154,7 +1340,14 @@ void playfield_age(playfield_t *playfield)
         }
     }
 
-    playfield_apply_gravity(playfield);
+    if (gamerule_gravity)
+    {
+        playfield_apply_gravity(playfield);
+    }
+    else
+    {
+        playfield_check_connections(playfield);
+    }
 }
 
 #define CURSOR_MOVE_UP 1
@@ -1248,28 +1441,42 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                 playfield_entry_t *cur = playfield_entry(playfield, playfield->curx, playfield->cury);
                 playfield_entry_t *swap = playfield_entry(playfield, playfield->curx - 1, playfield->cury);
 
-                // We allow bumping down for horizontal movements.
-                if (cur->block != BLOCK_TYPE_NONE)
+                if (gamerule_gravity)
                 {
-                    int simplemove = swap->block != BLOCK_TYPE_NONE;
+                    // We allow bumping down for horizontal movements.
+                    if (cur->block != BLOCK_TYPE_NONE)
+                    {
+                        int simplemove = swap->block != BLOCK_TYPE_NONE;
 
-                    if (simplemove)
-                    {
-                        playfield->curx--;
-                    }
-                    else
-                    {
-                        playfield->curx--;
-                        while(playfield_entry(playfield, playfield->curx, playfield->cury + 1)->block == BLOCK_TYPE_NONE)
+                        if (simplemove)
                         {
-                            playfield->cury++;
+                            playfield->curx--;
                         }
-                    }
+                        else
+                        {
+                            playfield->curx--;
+                            while(playfield_entry(playfield, playfield->curx, playfield->cury + 1)->block == BLOCK_TYPE_NONE)
+                            {
+                                playfield->cury++;
+                            }
+                        }
 
-                    playfield_entry_t temp;
-                    memcpy(&temp, cur, sizeof(playfield_entry_t));
-                    memcpy(cur, swap, sizeof(playfield_entry_t));
-                    memcpy(swap, &temp, sizeof(playfield_entry_t));
+                        playfield_entry_t temp;
+                        memcpy(&temp, cur, sizeof(playfield_entry_t));
+                        memcpy(cur, swap, sizeof(playfield_entry_t));
+                        memcpy(swap, &temp, sizeof(playfield_entry_t));
+                    }
+                }
+                else
+                {
+                    if (cur->block != BLOCK_TYPE_NONE && swap->block != BLOCK_TYPE_NONE)
+                    {
+                        playfield_entry_t temp;
+                        memcpy(&temp, cur, sizeof(playfield_entry_t));
+                        memcpy(cur, swap, sizeof(playfield_entry_t));
+                        memcpy(swap, &temp, sizeof(playfield_entry_t));
+                        playfield->cury++;
+                    }
                 }
             }
             break;
@@ -1281,35 +1488,56 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                 playfield_entry_t *cur = playfield_entry(playfield, playfield->curx, playfield->cury);
                 playfield_entry_t *swap = playfield_entry(playfield, playfield->curx + 1, playfield->cury);
 
-                // We allow bumping down for horizontal movements.
-                if (cur->block != BLOCK_TYPE_NONE)
+                if (gamerule_gravity)
                 {
-                    int simplemove = swap->block != BLOCK_TYPE_NONE;
+                    // We allow bumping down for horizontal movements.
+                    if (cur->block != BLOCK_TYPE_NONE)
+                    {
+                        int simplemove = swap->block != BLOCK_TYPE_NONE;
 
-                    if (simplemove)
-                    {
-                        playfield->curx++;
-                    }
-                    else
-                    {
-                        playfield->curx++;
-                        while(playfield_entry(playfield, playfield->curx, playfield->cury + 1)->block == BLOCK_TYPE_NONE)
+                        if (simplemove)
                         {
-                            playfield->cury++;
+                            playfield->curx++;
                         }
-                    }
+                        else
+                        {
+                            playfield->curx++;
+                            while(playfield_entry(playfield, playfield->curx, playfield->cury + 1)->block == BLOCK_TYPE_NONE)
+                            {
+                                playfield->cury++;
+                            }
+                        }
 
-                    playfield_entry_t temp;
-                    memcpy(&temp, cur, sizeof(playfield_entry_t));
-                    memcpy(cur, swap, sizeof(playfield_entry_t));
-                    memcpy(swap, &temp, sizeof(playfield_entry_t));
+                        playfield_entry_t temp;
+                        memcpy(&temp, cur, sizeof(playfield_entry_t));
+                        memcpy(cur, swap, sizeof(playfield_entry_t));
+                        memcpy(swap, &temp, sizeof(playfield_entry_t));
+                    }
+                }
+                else
+                {
+                    if (cur->block != BLOCK_TYPE_NONE && swap->block != BLOCK_TYPE_NONE)
+                    {
+                        playfield_entry_t temp;
+                        memcpy(&temp, cur, sizeof(playfield_entry_t));
+                        memcpy(cur, swap, sizeof(playfield_entry_t));
+                        memcpy(swap, &temp, sizeof(playfield_entry_t));
+                        playfield->cury++;
+                    }
                 }
             }
             break;
         }
     }
 
-    playfield_apply_gravity(playfield);
+    if (gamerule_gravity)
+    {
+        playfield_apply_gravity(playfield);
+    }
+    else
+    {
+        playfield_check_connections(playfield);
+    }
 }
 
 #define SWAP_DIRECTION_HORIZONTAL 21
@@ -1358,8 +1586,29 @@ void playfield_cursor_swap(playfield_t *playfield, int direction)
     playfield_check_connections(playfield);
 }
 
-#define PLAYFIELD_WIDTH 9
-#define PLAYFIELD_HEIGHT 12
+void playfield_cursor_drop(playfield_t *playfield)
+{
+    playfield_entry_t *cur = playfield_entry(playfield, playfield->curx, playfield->cury);
+    if (cur->block == BLOCK_TYPE_NONE && playfield->upnext->block != BLOCK_TYPE_NONE)
+    {
+        // Assign the block to the actual playfield.
+        memcpy(cur, playfield->upnext, sizeof(playfield_entry_t));
+
+        // Prepare the next upnext block.
+        memmove(&playfield->upnext[0], &playfield->upnext[1], sizeof(playfield_entry_t) * (UPNEXT_AMOUNT - 1));
+        memset(&playfield->upnext[UPNEXT_AMOUNT - 1], 0, sizeof(playfield_entry_t));
+        playfield_generate_upnext(playfield);
+    }
+
+    if (gamerule_gravity)
+    {
+        playfield_apply_gravity(playfield);
+    }
+    else
+    {
+        playfield_check_connections(playfield);
+    }
+}
 
 void main()
 {
@@ -1497,34 +1746,59 @@ void main()
     white_s = sprite_dup_rotate_cw(white_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
 
     playfield_t *playfield = playfield_new(PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT);
-    for (int y = 0; y < PLAYFIELD_HEIGHT; y++)
+
+    if (gamerule_placing)
     {
-        for (int x = 0; x < PLAYFIELD_WIDTH; x++)
+        playfield_generate_upnext(playfield);
+    }
+    else
+    {
+        for (int y = 0; y < PLAYFIELD_HEIGHT; y++)
         {
-            playfield_generate_block(playfield, x, y, 0.75);
+            for (int x = 0; x < PLAYFIELD_WIDTH; x++)
+            {
+                playfield_generate_block(playfield, x, y, 0.75);
+            }
         }
     }
-    playfield_apply_gravity(playfield);
 
-    playfield_set_source(playfield, -1, PLAYFIELD_HEIGHT - 1, SOURCE_COLOR_RED);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT - 1, SOURCE_COLOR_RED);
+    if (gamerule_gravity)
+    {
+        playfield_apply_gravity(playfield);
+    }
+    else
+    {
+        playfield_check_connections(playfield);
+    }
 
-    playfield_set_source(playfield, -1, PLAYFIELD_HEIGHT - 3, SOURCE_COLOR_GREEN);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT - 3, SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, -1, 1, SOURCE_COLOR_RED);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 1, SOURCE_COLOR_RED);
 
-    playfield_set_source(playfield, -1, PLAYFIELD_HEIGHT - 5, SOURCE_COLOR_BLUE);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT - 5, SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, -1, 3, SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 3, SOURCE_COLOR_GREEN);
+
+    playfield_set_source(playfield, -1, 5, SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 5, SOURCE_COLOR_BLUE);
+
+    playfield_set_source(playfield, -1, 7, SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 7, SOURCE_COLOR_GREEN);
+
+    playfield_set_source(playfield, -1, 9, SOURCE_COLOR_RED);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 9, SOURCE_COLOR_RED);
 
     playfield_set_source(playfield, 1, PLAYFIELD_HEIGHT, SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
     playfield_set_source(playfield, 3, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_BLUE);
     playfield_set_source(playfield, 5, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN);
     playfield_set_source(playfield, 7, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
 
+    playfield_set_source(playfield, 7, -1, SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, 5, -1, SOURCE_COLOR_RED | SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, 3, -1, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, 1, -1, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
+
     // FPS calculation for debugging.
     double fps_value = 60.0;
     unsigned int draw_time = 0;
-    unsigned int allow_rotation = 0;
-    unsigned int allow_dragging = 1;
 
     // Cursor repeat tracking.
     int repeats[4] = { -1, -1, -1, -1 };
@@ -1544,7 +1818,7 @@ void main()
         int dragging = 0;
 
         // Handle drag modifier.
-        if (allow_dragging)
+        if (gamerule_dragging)
         {
             if (held.player1.button3)
             {
@@ -1617,7 +1891,7 @@ void main()
                 playfield_cursor_move(playfield, CURSOR_MOVE_RIGHT);
             }
 
-            if (allow_rotation)
+            if (gamerule_rotation)
             {
                 if (pressed.player1.button1)
                 {
@@ -1628,7 +1902,7 @@ void main()
                     playfield_cursor_rotate(playfield, CURSOR_ROTATE_RIGHT);
                 }
             }
-            else
+            else if (gamerule_dragging)
             {
                 if (pressed.player1.button1)
                 {
@@ -1637,6 +1911,13 @@ void main()
                 if (pressed.player1.button2)
                 {
                     playfield_cursor_swap(playfield, SWAP_DIRECTION_VERTICAL);
+                }
+            }
+            else if (gamerule_placing)
+            {
+                if (pressed.player1.button1)
+                {
+                    playfield_cursor_drop(playfield);
                 }
             }
         }
@@ -1649,7 +1930,7 @@ void main()
         int width;
         int height;
         playfield_metrics(playfield, &width, &height);
-        playfield_draw((video_width() - width) / 2, 32, playfield);
+        playfield_draw((video_width() - width) / 2, 24, playfield);
 
         // Draw debugging
         video_draw_debug_text(

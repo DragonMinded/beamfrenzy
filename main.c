@@ -164,6 +164,7 @@ typedef struct
     int curx;
     int cury;
     int score;
+    int running;
     float timeleft;
     playfield_entry_t *entries;
     source_entry_t *sources;
@@ -585,6 +586,23 @@ void *playfield_color_sprite(playfield_entry_t *cur)
     return 0;
 }
 
+int playfield_game_over(playfield_t *playfield)
+{
+    for (int y = 0; y < PLAYFIELD_HEIGHT; y++)
+    {
+        for (int x = 0; x < PLAYFIELD_WIDTH; x++)
+        {
+            playfield_entry_t *cur = playfield_entry(playfield, x, y);
+            if (cur->block == BLOCK_TYPE_NONE)
+            {
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+}
+
 void playfield_draw(int x, int y, playfield_t *playfield)
 {
     video_draw_box(
@@ -653,6 +671,29 @@ void playfield_draw(int x, int y, playfield_t *playfield)
             x + (BLOCK_WIDTH * (playfield->width + 3)) + 12, 24 + BLOCK_HEIGHT + 12,
             rgb(255, 255, 255),
             "%d", left
+        );
+
+        char message[128];
+        memset(message, 0, 128);
+        if (playfield->running)
+        {
+            if (playfield_game_over(playfield))
+            {
+                strcpy(message, "Game over!");
+            }
+        }
+        else
+        {
+            strcpy(message, "Press start!");
+        }
+
+        // Draw score and such.
+        video_draw_debug_text(
+            x + (BLOCK_WIDTH * (playfield->width + 2)) + 12, y + (BLOCK_HEIGHT * (playfield->height)),
+            rgb(255, 255, 255),
+            "Score: %d\n\n%s",
+            playfield->score,
+            message
         );
     }
 
@@ -961,7 +1002,7 @@ void playfield_draw(int x, int y, playfield_t *playfield)
             }
 
             // Finally, draw the cursor
-            if (pwidth == playfield->curx && pheight == playfield->cury)
+            if (playfield->running && pwidth == playfield->curx && pheight == playfield->cury)
             {
                 video_draw_sprite(xloc + CURSOR_OFFSET_X, yloc + CURSOR_OFFSET_Y, CURSOR_WIDTH, CURSOR_HEIGHT, cursor);
             }
@@ -1954,6 +1995,80 @@ void playfield_drop_anywhere(playfield_t *playfield)
     }
 }
 
+void playfield_run(playfield_t *playfield)
+{
+    memset(playfield->entries, 0, sizeof(playfield_entry_t) * playfield->width * playfield->height);
+    memset(playfield->sources, 0, sizeof(source_entry_t) * ((playfield->width * 2) + (playfield->height * 2)));
+    memset(playfield->upnext, 0, sizeof(playfield_entry_t) * UPNEXT_AMOUNT);
+
+    if (gamerule_placing)
+    {
+        playfield_generate_upnext(playfield);
+    }
+    else
+    {
+        for (int y = 0; y < PLAYFIELD_HEIGHT; y++)
+        {
+            for (int x = 0; x < PLAYFIELD_WIDTH; x++)
+            {
+                playfield_generate_block(playfield, x, y, 0.75);
+            }
+        }
+    }
+
+    if (gamerule_gravity)
+    {
+        playfield_apply_gravity(playfield);
+    }
+    else
+    {
+        playfield_check_connections(playfield);
+    }
+
+    playfield_set_source(playfield, -1, 1, SOURCE_COLOR_RED);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 1, SOURCE_COLOR_RED);
+
+    playfield_set_source(playfield, -1, 3, SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 3, SOURCE_COLOR_GREEN);
+
+    playfield_set_source(playfield, -1, 5, SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 5, SOURCE_COLOR_BLUE);
+
+    playfield_set_source(playfield, -1, 7, SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 7, SOURCE_COLOR_GREEN);
+
+    playfield_set_source(playfield, -1, 9, SOURCE_COLOR_RED);
+    playfield_set_source(playfield, PLAYFIELD_WIDTH, 9, SOURCE_COLOR_RED);
+
+    playfield_set_source(playfield, 1, PLAYFIELD_HEIGHT, SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, 3, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, 5, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, 7, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
+
+    playfield_set_source(playfield, 7, -1, SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, 5, -1, SOURCE_COLOR_RED | SOURCE_COLOR_BLUE);
+    playfield_set_source(playfield, 3, -1, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN);
+    playfield_set_source(playfield, 1, -1, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
+
+    playfield->score = 0;
+    playfield->running = 1;
+}
+
+void playfield_stop(playfield_t *playfield)
+{
+    playfield->running = 0;
+}
+
+int playfield_running(playfield_t *playfield)
+{
+    if (playfield->running == 0)
+    {
+        return 0;
+    }
+
+    return !playfield_game_over(playfield);
+}
+
 void main()
 {
     // Get settings so we know how many controls to read.
@@ -2093,55 +2208,6 @@ void main()
 
     playfield_t *playfield = playfield_new(PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT);
 
-    if (gamerule_placing)
-    {
-        playfield_generate_upnext(playfield);
-    }
-    else
-    {
-        for (int y = 0; y < PLAYFIELD_HEIGHT; y++)
-        {
-            for (int x = 0; x < PLAYFIELD_WIDTH; x++)
-            {
-                playfield_generate_block(playfield, x, y, 0.75);
-            }
-        }
-    }
-
-    if (gamerule_gravity)
-    {
-        playfield_apply_gravity(playfield);
-    }
-    else
-    {
-        playfield_check_connections(playfield);
-    }
-
-    playfield_set_source(playfield, -1, 1, SOURCE_COLOR_RED);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, 1, SOURCE_COLOR_RED);
-
-    playfield_set_source(playfield, -1, 3, SOURCE_COLOR_GREEN);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, 3, SOURCE_COLOR_GREEN);
-
-    playfield_set_source(playfield, -1, 5, SOURCE_COLOR_BLUE);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, 5, SOURCE_COLOR_BLUE);
-
-    playfield_set_source(playfield, -1, 7, SOURCE_COLOR_GREEN);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, 7, SOURCE_COLOR_GREEN);
-
-    playfield_set_source(playfield, -1, 9, SOURCE_COLOR_RED);
-    playfield_set_source(playfield, PLAYFIELD_WIDTH, 9, SOURCE_COLOR_RED);
-
-    playfield_set_source(playfield, 1, PLAYFIELD_HEIGHT, SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
-    playfield_set_source(playfield, 3, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_BLUE);
-    playfield_set_source(playfield, 5, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN);
-    playfield_set_source(playfield, 7, PLAYFIELD_HEIGHT, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
-
-    playfield_set_source(playfield, 7, -1, SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
-    playfield_set_source(playfield, 5, -1, SOURCE_COLOR_RED | SOURCE_COLOR_BLUE);
-    playfield_set_source(playfield, 3, -1, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN);
-    playfield_set_source(playfield, 1, -1, SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE);
-
     // FPS calculation for debugging.
     double fps_value = 60.0;
     unsigned int draw_time = 0;
@@ -2163,133 +2229,138 @@ void main()
         jvs_buttons_t released = maple_buttons_released();
         int dragging = 0;
 
-        // Handle drag modifier.
-        if (gamerule_dragging)
+        if (playfield_running(playfield))
         {
-            if (held.player1.button3)
+            // Handle drag modifier.
+            if (gamerule_dragging)
             {
-                dragging = 1;
+                if (held.player1.button3)
+                {
+                    dragging = 1;
 
+                    if (pressed.player1.up)
+                    {
+                        playfield_cursor_drag(playfield, CURSOR_MOVE_UP);
+                    }
+                    if (pressed.player1.down)
+                    {
+                        playfield_cursor_drag(playfield, CURSOR_MOVE_DOWN);
+                    }
+                    if (pressed.player1.left)
+                    {
+                        playfield_cursor_drag(playfield, CURSOR_MOVE_LEFT);
+                    }
+                    if (pressed.player1.right)
+                    {
+                        playfield_cursor_drag(playfield, CURSOR_MOVE_RIGHT);
+                    }
+                }
+                else if(released.player1.button3)
+                {
+                    // Let go of a drag, lets reset repeats.
+                    for (int i = 0; i < 4; i++)
+                    {
+                        repeats[i] = -1;
+                    }
+                }
+            }
+
+            // Handle normal cursor movement.
+            if (!dragging)
+            {
                 if (pressed.player1.up)
                 {
-                    playfield_cursor_drag(playfield, CURSOR_MOVE_UP);
+                    repeat_init(pressed.player1.up, &repeats[0]);
+                    playfield_cursor_move(playfield, CURSOR_MOVE_UP);
+                }
+                else if (repeat(held.player1.up, &repeats[0]))
+                {
+                    playfield_cursor_move(playfield, CURSOR_MOVE_UP);
                 }
                 if (pressed.player1.down)
                 {
-                    playfield_cursor_drag(playfield, CURSOR_MOVE_DOWN);
+                    repeat_init(pressed.player1.down, &repeats[1]);
+                    playfield_cursor_move(playfield, CURSOR_MOVE_DOWN);
+                }
+                else if (repeat(held.player1.down, &repeats[1]))
+                {
+                    playfield_cursor_move(playfield, CURSOR_MOVE_DOWN);
                 }
                 if (pressed.player1.left)
                 {
-                    playfield_cursor_drag(playfield, CURSOR_MOVE_LEFT);
+                    repeat_init(pressed.player1.left, &repeats[2]);
+                    playfield_cursor_move(playfield, CURSOR_MOVE_LEFT);
+                }
+                else if (repeat(held.player1.left, &repeats[2]))
+                {
+                    playfield_cursor_move(playfield, CURSOR_MOVE_LEFT);
                 }
                 if (pressed.player1.right)
                 {
-                    playfield_cursor_drag(playfield, CURSOR_MOVE_RIGHT);
+                    repeat_init(pressed.player1.right, &repeats[3]);
+                    playfield_cursor_move(playfield, CURSOR_MOVE_RIGHT);
+                }
+                else if (repeat(held.player1.right, &repeats[3]))
+                {
+                    playfield_cursor_move(playfield, CURSOR_MOVE_RIGHT);
+                }
+
+                if (gamerule_rotation)
+                {
+                    if (pressed.player1.button1)
+                    {
+                        playfield_cursor_rotate(playfield, CURSOR_ROTATE_LEFT);
+                    }
+                    if (pressed.player1.button2)
+                    {
+                        playfield_cursor_rotate(playfield, CURSOR_ROTATE_RIGHT);
+                    }
+                }
+                else if (gamerule_dragging)
+                {
+                    if (pressed.player1.button1)
+                    {
+                        playfield_cursor_swap(playfield, SWAP_DIRECTION_HORIZONTAL);
+                    }
+                    if (pressed.player1.button2)
+                    {
+                        playfield_cursor_swap(playfield, SWAP_DIRECTION_VERTICAL);
+                    }
+                }
+                else if (gamerule_placing)
+                {
+                    if (pressed.player1.button1)
+                    {
+                        playfield_cursor_drop(playfield);
+                    }
                 }
             }
-            else if(released.player1.button3)
+
+            if (gamerule_placing)
             {
-                // Let go of a drag, lets reset repeats.
-                for (int i = 0; i < 4; i++)
-                {
-                    repeats[i] = -1;
-                }
+                playfield_drop_anywhere(playfield);
             }
         }
-
-        // Handle normal cursor movement.
-        if (!dragging)
+        else
         {
-            if (pressed.player1.up)
+            if (pressed.player1.start)
             {
-                repeat_init(pressed.player1.up, &repeats[0]);
-                playfield_cursor_move(playfield, CURSOR_MOVE_UP);
-            }
-            else if (repeat(held.player1.up, &repeats[0]))
-            {
-                playfield_cursor_move(playfield, CURSOR_MOVE_UP);
-            }
-            if (pressed.player1.down)
-            {
-                repeat_init(pressed.player1.down, &repeats[1]);
-                playfield_cursor_move(playfield, CURSOR_MOVE_DOWN);
-            }
-            else if (repeat(held.player1.down, &repeats[1]))
-            {
-                playfield_cursor_move(playfield, CURSOR_MOVE_DOWN);
-            }
-            if (pressed.player1.left)
-            {
-                repeat_init(pressed.player1.left, &repeats[2]);
-                playfield_cursor_move(playfield, CURSOR_MOVE_LEFT);
-            }
-            else if (repeat(held.player1.left, &repeats[2]))
-            {
-                playfield_cursor_move(playfield, CURSOR_MOVE_LEFT);
-            }
-            if (pressed.player1.right)
-            {
-                repeat_init(pressed.player1.right, &repeats[3]);
-                playfield_cursor_move(playfield, CURSOR_MOVE_RIGHT);
-            }
-            else if (repeat(held.player1.right, &repeats[3]))
-            {
-                playfield_cursor_move(playfield, CURSOR_MOVE_RIGHT);
-            }
-
-            if (gamerule_rotation)
-            {
-                if (pressed.player1.button1)
-                {
-                    playfield_cursor_rotate(playfield, CURSOR_ROTATE_LEFT);
-                }
-                if (pressed.player1.button2)
-                {
-                    playfield_cursor_rotate(playfield, CURSOR_ROTATE_RIGHT);
-                }
-            }
-            else if (gamerule_dragging)
-            {
-                if (pressed.player1.button1)
-                {
-                    playfield_cursor_swap(playfield, SWAP_DIRECTION_HORIZONTAL);
-                }
-                if (pressed.player1.button2)
-                {
-                    playfield_cursor_swap(playfield, SWAP_DIRECTION_VERTICAL);
-                }
-            }
-            else if (gamerule_placing)
-            {
-                if (pressed.player1.button1)
-                {
-                    playfield_cursor_drop(playfield);
-                }
+                playfield_run(playfield);
             }
         }
 
-        if (gamerule_placing)
+        if (playfield_running(playfield))
         {
-            playfield_drop_anywhere(playfield);
+            // Age the playfield so we can get rid of any beams that have stuck
+            // around too long.
+            playfield_age(playfield);
         }
-
-        // Age the playfield so we can get rid of any beams that have stuck
-        // around too long.
-        playfield_age(playfield);
 
         // Draw the playfield
         int width;
         int height;
         playfield_metrics(playfield, &width, &height);
         playfield_draw((video_width() - width) / 2, 24, playfield);
-
-        // Draw score and such.
-        video_draw_debug_text(
-            24, 24,
-            rgb(255, 255, 255),
-            "Score: %d",
-            playfield->score
-        );
 
         // Draw debugging
         video_draw_debug_text(
@@ -2311,7 +2382,7 @@ void main()
         uint32_t uspf = profile_end(fps);
         fps_value = (1000000.0 / (double)uspf) + 0.01;
 
-        if (gamerule_placing)
+        if (playfield_running(playfield) && gamerule_placing)
         {
             // Make sure there's some time limit for placing.
             playfield_decrease_placetime(playfield, (float)uspf / 1000000.0);

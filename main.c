@@ -135,6 +135,7 @@ int gamerule_gravity = 0;
 int gamerule_rotation = 0;
 int gamerule_dragging = 0;
 int gamerule_placing = 1;
+int gamerule_placetimer = 1;
 
 typedef struct
 {
@@ -657,21 +658,24 @@ void playfield_draw(int x, int y, playfield_t *playfield)
             }
         }
 
-        int left = ((int)playfield->timeleft) + 1;
-        if (left > 5)
+        if (gamerule_placetimer)
         {
-            left = 5;
-        }
-        if (left < 0)
-        {
-            left = 0;
-        }
+            int left = ((int)playfield->timeleft) + 1;
+            if (left > 5)
+            {
+                left = 5;
+            }
+            if (left < 0)
+            {
+                left = 0;
+            }
 
-        video_draw_debug_text(
-            x + (BLOCK_WIDTH * (playfield->width + 3)) + 12, 24 + BLOCK_HEIGHT + 12,
-            rgb(255, 255, 255),
-            "%d", left
-        );
+            video_draw_debug_text(
+                x + (BLOCK_WIDTH * (playfield->width + 3)) + 12, 24 + BLOCK_HEIGHT + 12,
+                rgb(255, 255, 255),
+                "%d", left
+            );
+        }
 
         char message[128];
         memset(message, 0, 128);
@@ -1083,7 +1087,10 @@ void playfield_generate_upnext(playfield_t *playfield)
         }
     }
 
-    playfield->timeleft = PLACE_TIME;
+    if (gamerule_placetimer)
+    {
+        playfield->timeleft = PLACE_TIME;
+    }
 }
 
 void playfield_set_source(playfield_t *playfield, int x, int y, unsigned int color)
@@ -1927,38 +1934,27 @@ int playfield_cursor_drop(playfield_t *playfield)
 
 void playfield_decrease_placetime(playfield_t *playfield, float elapsed)
 {
-    playfield->timeleft -= elapsed;
+    if (gamerule_placetimer)
+    {
+        playfield->timeleft -= elapsed;
+    }
 }
 
 void playfield_drop_anywhere(playfield_t *playfield)
 {
-    if (playfield->timeleft <= 0.0 && playfield->upnext->block != BLOCK_TYPE_NONE)
+    if (gamerule_placetimer)
     {
-        // Try to drop on the cursor.
-        int success = playfield_cursor_drop(playfield);
-        if (success)
+        if (playfield->timeleft <= 0.0 && playfield->upnext->block != BLOCK_TYPE_NONE)
         {
-            return;
-        }
-
-        // Drop randomly.
-        int available = 0;
-        for (int y = 0; y < playfield->height; y++)
-        {
-            for (int x = 0; x < playfield->width; x++)
+            // Try to drop on the cursor.
+            int success = playfield_cursor_drop(playfield);
+            if (success)
             {
-                playfield_entry_t *cur = playfield_entry(playfield, x, y);
-                if (cur->block == BLOCK_TYPE_NONE)
-                {
-                    available++;
-                }
+                return;
             }
-        }
 
-        if (available)
-        {
-            int location = (int)(chance() * available);
-            int actual = 0;
+            // Drop randomly.
+            int available = 0;
             for (int y = 0; y < playfield->height; y++)
             {
                 for (int x = 0; x < playfield->width; x++)
@@ -1966,28 +1962,45 @@ void playfield_drop_anywhere(playfield_t *playfield)
                     playfield_entry_t *cur = playfield_entry(playfield, x, y);
                     if (cur->block == BLOCK_TYPE_NONE)
                     {
-                        if (actual == location)
+                        available++;
+                    }
+                }
+            }
+
+            if (available)
+            {
+                int location = (int)(chance() * available);
+                int actual = 0;
+                for (int y = 0; y < playfield->height; y++)
+                {
+                    for (int x = 0; x < playfield->width; x++)
+                    {
+                        playfield_entry_t *cur = playfield_entry(playfield, x, y);
+                        if (cur->block == BLOCK_TYPE_NONE)
                         {
-                            // Assign the block to the actual playfield.
-                            memcpy(cur, playfield->upnext, sizeof(playfield_entry_t));
-
-                            // Prepare the next upnext block.
-                            memmove(&playfield->upnext[0], &playfield->upnext[1], sizeof(playfield_entry_t) * (UPNEXT_AMOUNT - 1));
-                            memset(&playfield->upnext[UPNEXT_AMOUNT - 1], 0, sizeof(playfield_entry_t));
-                            playfield_generate_upnext(playfield);
-
-                            if (gamerule_gravity)
+                            if (actual == location)
                             {
-                                playfield_apply_gravity(playfield);
-                            }
-                            else
-                            {
-                                playfield_check_connections(playfield);
-                            }
+                                // Assign the block to the actual playfield.
+                                memcpy(cur, playfield->upnext, sizeof(playfield_entry_t));
 
-                            return;
+                                // Prepare the next upnext block.
+                                memmove(&playfield->upnext[0], &playfield->upnext[1], sizeof(playfield_entry_t) * (UPNEXT_AMOUNT - 1));
+                                memset(&playfield->upnext[UPNEXT_AMOUNT - 1], 0, sizeof(playfield_entry_t));
+                                playfield_generate_upnext(playfield);
+
+                                if (gamerule_gravity)
+                                {
+                                    playfield_apply_gravity(playfield);
+                                }
+                                else
+                                {
+                                    playfield_check_connections(playfield);
+                                }
+
+                                return;
+                            }
+                            actual++;
                         }
-                        actual++;
                     }
                 }
             }

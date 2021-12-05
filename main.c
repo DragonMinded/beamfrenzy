@@ -1637,6 +1637,8 @@ void playfield_apply_gravity(playfield_t *playfield)
 
 void playfield_age(playfield_t *playfield)
 {
+    static int mult[8] = {0, 1, 1, 2, 1, 2, 2, 4};
+
     for (int y = 0; y < playfield->height; y++)
     {
         for (int x = 0; x < playfield->width; x++)
@@ -1648,6 +1650,15 @@ void playfield_age(playfield_t *playfield)
             {
                 if (cur->age > MAX_AGE)
                 {
+                    if (cur->color == SOURCE_COLOR_IMPOSSIBLE)
+                    {
+                        playfield->score -= 5;
+                    }
+                    else
+                    {
+                        playfield->score += mult[cur->color & 7] * 5;
+                    }
+
                     memset(cur, 0, sizeof(playfield_entry_t));
                 }
                 else
@@ -1665,6 +1676,11 @@ void playfield_age(playfield_t *playfield)
     else
     {
         playfield_check_connections(playfield);
+    }
+
+    if (playfield->score < 0)
+    {
+        playfield->score = 0;
     }
 }
 

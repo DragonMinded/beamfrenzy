@@ -152,6 +152,7 @@ typedef struct
 #define SOURCE_COLOR_RED 0x1
 #define SOURCE_COLOR_GREEN 0x2
 #define SOURCE_COLOR_BLUE 0x4
+#define SOURCE_COLOR_IMPOSSIBLE 0x8
 
 #define UPNEXT_AMOUNT 5
 
@@ -188,6 +189,7 @@ typedef struct
 #define CURSOR_OFFSET_Y -16
 
 void *cursor = 0;
+void *impossible = 0;
 
 void *block_purple = 0;
 void *block_orange = 0;
@@ -376,6 +378,11 @@ void *playfield_pipe_sprite(playfield_entry_t *cur)
 
 void *playfield_color_sprite(playfield_entry_t *cur)
 {
+    if (cur->color == SOURCE_COLOR_IMPOSSIBLE)
+    {
+        return impossible;
+    }
+
     switch(cur->pipe)
     {
         case PIPE_CONN_E | PIPE_CONN_W:
@@ -977,6 +984,7 @@ void playfield_set_block(playfield_t *playfield, int x, int y, unsigned int bloc
 void playfield_generate_block(playfield_t *playfield, int x, int y, float block_chance)
 {
     static unsigned int bits[4] = { PIPE_CONN_N, PIPE_CONN_E, PIPE_CONN_S, PIPE_CONN_W };
+    static int chance_add = 0;
 
     if (chance() <= block_chance)
     {
@@ -986,15 +994,17 @@ void playfield_generate_block(playfield_t *playfield, int x, int y, float block_
         cur->block = color;
 
         // Now handle the connections.
-        int corner = (int)(chance() * 4.0);
+        int corner = (int)(chance() * 4.0) + chance_add;
         int second = (int)(chance() * 3.0);
-        cur->pipe = bits[corner] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
+        cur->pipe = bits[corner % 4] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
+        chance_add++;
     }
 }
 
 void playfield_generate_upnext(playfield_t *playfield)
 {
     static unsigned int bits[4] = { PIPE_CONN_N, PIPE_CONN_E, PIPE_CONN_S, PIPE_CONN_W };
+    static int chance_add = 0;
 
     for (int i = 0; i < UPNEXT_AMOUNT; i++)
     {
@@ -1005,10 +1015,11 @@ void playfield_generate_upnext(playfield_t *playfield)
             int color = (int)(chance() * 4.0) + 1;
             cur->block = color;
 
-            int corner = (int)(chance() * 4.0);
+            int corner = (int)(chance() * 4.0) + chance_add;
             int second = (int)(chance() * 2.0);
 
-            cur->pipe = bits[corner] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
+            cur->pipe = bits[corner % 4] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
+            chance_add++;
         }
     }
 }
@@ -1052,7 +1063,7 @@ int playfield_touches_light(playfield_t *playfield, int x, int y, int in_directi
     {
         case PIPE_CONN_N:
         {
-            // Goes out north. Either it hits the sky or it goes to another block.
+            // Goes out north. Either it hits a light block or it goes to another block.
             if (y == 0)
             {
                 source_entry_t *source = playfield->sources + (2 * playfield->height) + playfield->width + x;
@@ -1124,7 +1135,7 @@ void playfield_fill_light(playfield_t *playfield, int x, int y, int in_direction
     {
         case PIPE_CONN_N:
         {
-            // Goes out north. Either it hits the sky or it goes to another block.
+            // Goes out north. Either it hits a light block or it goes to another block.
             if (y > 0)
             {
                 return playfield_fill_light(playfield, x, y - 1, PIPE_CONN_S, color);
@@ -1157,6 +1168,221 @@ void playfield_fill_light(playfield_t *playfield, int x, int y, int in_direction
                 return playfield_fill_light(playfield, x - 1, y, PIPE_CONN_E, color);
             }
             break;
+        }
+    }
+}
+
+int playfield_possible_color(playfield_t *playfield, int x, int y, char *visited, int in_direction)
+{
+    // First, if this doesn't have a connection in the in direction, its always no color.
+    playfield_entry_t *cur = playfield_entry(playfield, x, y);
+    if (visited[x + (y * playfield->width)])
+    {
+        // We already visited this, there's a loop or we point inward at ourselves
+        // in a way that's impossible to recover from.
+        return SOURCE_COLOR_IMPOSSIBLE;
+    }
+    if (cur->block == BLOCK_TYPE_NONE)
+    {
+        // No block here, so its possible to place another block change this pipe
+        // to any color.
+        return SOURCE_COLOR_NONE;
+    }
+    if (in_direction != 0)
+    {
+        if ((cur->pipe & in_direction) == 0)
+        {
+            // Block here, but it doesn't connect, so it could possibly be cleared.
+            // We should pretend that this is a no-color.
+            return SOURCE_COLOR_NONE;
+        }
+    }
+
+    // Mark that we visited this block.
+    visited[x + (y * playfield->width)] = 1;
+
+    // Calculate the other directions of the pipe by removing the in direction.
+    unsigned int out_directions = cur->pipe & (~in_direction);
+    unsigned int source_color = SOURCE_COLOR_NONE;
+    for (int i = 0; i < 4; i++)
+    {
+        // Calculate what direction we need to examine.
+        unsigned int out_direction = out_directions & (1 << i);
+        if (out_direction == 0)
+        {
+            continue;
+        }
+
+        // Calculate the color in that direction.
+        unsigned int direction_color = SOURCE_COLOR_IMPOSSIBLE;
+        switch(out_direction)
+        {
+            case PIPE_CONN_N:
+            {
+                // Goes out north. Either it hits a light block or it goes to another block.
+                if (y == 0)
+                {
+                    source_entry_t *source = playfield->sources + (2 * playfield->height) + playfield->width + x;
+                    direction_color = source->color ? source->color : SOURCE_COLOR_IMPOSSIBLE;
+                }
+                else
+                {
+                    direction_color = playfield_possible_color(playfield, x, y - 1, visited, PIPE_CONN_S);
+                }
+                break;
+            }
+            case PIPE_CONN_S:
+            {
+                // Goes out south. Either it hits a light block or it goes to another block.
+                if (y == playfield->height - 1)
+                {
+                    source_entry_t *source = playfield->sources + (2 * playfield->height) + x;
+                    direction_color = source->color ? source->color : SOURCE_COLOR_IMPOSSIBLE;
+                }
+                else
+                {
+                    direction_color = playfield_possible_color(playfield, x, y + 1, visited, PIPE_CONN_N);
+                }
+                break;
+            }
+            case PIPE_CONN_E:
+            {
+                // Goes out east. Either it hits a light block or it goes to another block.
+                if (x == playfield->width - 1)
+                {
+                    source_entry_t *source = playfield->sources + playfield->height + y;
+                    direction_color = source->color ? source->color : SOURCE_COLOR_IMPOSSIBLE;
+                }
+                else
+                {
+                    direction_color = playfield_possible_color(playfield, x + 1, y, visited, PIPE_CONN_W);
+                }
+                break;
+            }
+            case PIPE_CONN_W:
+            {
+                // Goes out west. Either it hits a light block or it goes to another block.
+                if (x == 0)
+                {
+                    source_entry_t *source = playfield->sources + y;
+                    direction_color = source->color ? source->color : SOURCE_COLOR_IMPOSSIBLE;
+                }
+                else
+                {
+                    direction_color = playfield_possible_color(playfield, x - 1, y, visited, PIPE_CONN_E);
+                }
+                break;
+            }
+        }
+
+        if (direction_color == SOURCE_COLOR_IMPOSSIBLE)
+        {
+            // We got our answer.
+            return SOURCE_COLOR_IMPOSSIBLE;
+        }
+
+        if (source_color == SOURCE_COLOR_NONE && direction_color != SOURCE_COLOR_NONE)
+        {
+            source_color = direction_color;
+        }
+        else if (source_color != SOURCE_COLOR_NONE && direction_color == SOURCE_COLOR_NONE)
+        {
+            // This is fine, leave source color alone.
+        }
+        else if (source_color == direction_color)
+        {
+            // This is fine, leave source color alone.
+        }
+        else
+        {
+            if ((source_color & direction_color) == source_color)
+            {
+                // This is okay, the direction color contains more bands than ourselves,
+                // or its identical to the source color, so the color remains the same.
+            }
+            else if ((source_color & direction_color) == direction_color)
+            {
+                // This is okay, the source color contains more bands than the direction
+                // color or it is identical to the source color, so we update to the
+                // direction color.
+                source_color = direction_color;
+            }
+            else
+            {
+                // This is not okay! Wrong color bands touching.
+                return SOURCE_COLOR_IMPOSSIBLE;
+            }
+        }
+    }
+
+    return source_color;
+}
+
+void playfield_mark_impossible(playfield_t *playfield, int x, int y, int in_direction)
+{
+    // First, if this doesn't have a connection in the in direction, don't destroy it.
+    playfield_entry_t *cur = playfield_entry(playfield, x, y);
+    if (cur->color == SOURCE_COLOR_IMPOSSIBLE)
+    {
+        return;
+    }
+    if (cur->block == BLOCK_TYPE_NONE)
+    {
+        // No block here, so do nothing.
+        return;
+    }
+    if (in_direction != 0)
+    {
+        if ((cur->pipe & in_direction) == 0)
+        {
+            return;
+        }
+    }
+
+    // Calculate the other directions of the pipe by removing the in direction.
+    unsigned int out_directions = cur->pipe & (~in_direction);
+    cur->color = SOURCE_COLOR_IMPOSSIBLE;
+    for (int i = 0; i < 4; i++)
+    {
+        unsigned int out_direction = out_directions & (1 << i);
+        switch(out_direction)
+        {
+            case PIPE_CONN_N:
+            {
+                // Goes out north. Either it hits a light block or it goes to another block.
+                if (y > 0)
+                {
+                    playfield_mark_impossible(playfield, x, y - 1, PIPE_CONN_S);
+                }
+                break;
+            }
+            case PIPE_CONN_S:
+            {
+                // Goes out south. Either it hits a light block or it goes to another block.
+                if (y < playfield->height - 1)
+                {
+                    playfield_mark_impossible(playfield, x, y + 1, PIPE_CONN_N);
+                }
+                break;
+            }
+            case PIPE_CONN_E:
+            {
+                // Goes out east. Either it hits a light block or it goes to another block.
+                if (x < playfield->width - 1)
+                {
+                    playfield_mark_impossible(playfield, x + 1, y, PIPE_CONN_W);
+                }
+                break;
+            }
+            case PIPE_CONN_W:
+            {
+                // Goes out west. Either it hits a light block or it goes to another block.
+                if (x > 0)
+                {
+                    playfield_mark_impossible(playfield, x - 1, y, PIPE_CONN_E);
+                }
+                break;
+            }
         }
     }
 }
@@ -1215,6 +1441,29 @@ void playfield_check_connections(playfield_t *playfield)
             if (playfield_touches_light(playfield, lsx, 0, PIPE_CONN_N, source->color))
             {
                 playfield_fill_light(playfield, lsx, 0, PIPE_CONN_N, source->color);
+            }
+        }
+    }
+
+    // Now, find and mark impossible chunks of pipes.
+    if (gamerule_placing)
+    {
+        for (int y = 0; y < playfield->height; y++)
+        {
+            for (int x = 0; x < playfield->width; x++)
+            {
+                playfield_entry_t *cur = playfield_entry(playfield, x, y);
+                if (cur->block != BLOCK_TYPE_NONE && cur->color == SOURCE_COLOR_NONE)
+                {
+                    char *visited = malloc(playfield->width * playfield->height);
+                    memset(visited, 0, playfield->width * playfield->height);
+
+                    if (playfield_possible_color(playfield, x, y, visited, 0) == SOURCE_COLOR_IMPOSSIBLE)
+                    {
+                        playfield_mark_impossible(playfield, x, y, 0);
+                    }
+                    free(visited);
+                }
             }
         }
     }
@@ -1315,7 +1564,7 @@ void playfield_apply_gravity(playfield_t *playfield)
     playfield_check_connections(playfield);
 }
 
-#define MAX_AGE 30
+#define MAX_AGE 60
 
 void playfield_age(playfield_t *playfield)
 {
@@ -1625,6 +1874,8 @@ void main()
 
     // Load sprites.
     cursor = sprite_load("rom://sprites/cursor");
+    impossible = sprite_load("rom://sprites/impossible");
+
     block_purple = sprite_load("rom://sprites/purpleblock");
     block_blue = sprite_load("rom://sprites/blueblock");
     block_green = sprite_load("rom://sprites/greenblock");

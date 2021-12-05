@@ -26,6 +26,7 @@ build/romfs.bin: romfs/ ${ROMFSGEN_FILE} ${IMG2BIN_FILE}
 	${IMG2BIN} romfs/sprites/greenblock assets/sprites/greenblock.png --depth 16
 	${IMG2BIN} romfs/sprites/orangeblock assets/sprites/orangeblock.png --depth 16
 	${IMG2BIN} romfs/sprites/grayblock assets/sprites/grayblock.png --depth 16
+	${IMG2BIN} romfs/sprites/impossible assets/sprites/impossible.png --depth 16
 	${IMG2BIN} romfs/sprites/source assets/sprites/source.png --depth 16
 	${IMG2BIN} romfs/sprites/red assets/sprites/red.png --depth 16
 	${IMG2BIN} romfs/sprites/green assets/sprites/green.png --depth 16

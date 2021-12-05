@@ -25,6 +25,10 @@ build/romfs.bin: romfs/ ${ROMFSGEN_FILE} ${IMG2BIN_FILE}
 	${IMG2BIN} romfs/sprites/red assets/sprites/red.png --depth 16
 	${IMG2BIN} romfs/sprites/green assets/sprites/green.png --depth 16
 	${IMG2BIN} romfs/sprites/blue assets/sprites/blue.png --depth 16
+	${IMG2BIN} romfs/sprites/cyan assets/sprites/cyan.png --depth 16
+	${IMG2BIN} romfs/sprites/magenta assets/sprites/magenta.png --depth 16
+	${IMG2BIN} romfs/sprites/yellow assets/sprites/yellow.png --depth 16
+	${IMG2BIN} romfs/sprites/white assets/sprites/white.png --depth 16
 	${IMG2BIN} romfs/sprites/cursor assets/sprites/cursor.png --depth 16
 	${IMG2BIN} romfs/sprites/straightpipe assets/sprites/straightpipe.png --depth 16
 	${IMG2BIN} romfs/sprites/straightred assets/sprites/straightred.png --depth 16

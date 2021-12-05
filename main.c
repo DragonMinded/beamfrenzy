@@ -156,6 +156,11 @@ typedef struct
 
 #define BLOCK_TYPE_NONE 0
 #define BLOCK_TYPE_PURPLE 1
+#define BLOCK_TYPE_ORANGE 2
+#define BLOCK_TYPE_BROWN 3
+#define BLOCK_TYPE_BLUE 4
+#define BLOCK_TYPE_GREEN 5
+#define BLOCK_TYPE_GRAY 6
 
 #define PIPE_CONN_NONE 0
 #define PIPE_CONN_N 0x1
@@ -174,6 +179,11 @@ typedef struct
 void *cursor = 0;
 
 void *block_purple = 0;
+void *block_orange = 0;
+void *block_brown = 0;
+void *block_blue = 0;
+void *block_green = 0;
+void *block_gray = 0;
 
 void *pipe_ns = 0;
 void *red_ns = 0;
@@ -294,6 +304,31 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                     case BLOCK_TYPE_PURPLE:
                     {
                         blocksprite = block_purple;
+                        break;
+                    }
+                    case BLOCK_TYPE_ORANGE:
+                    {
+                        blocksprite = block_orange;
+                        break;
+                    }
+                    case BLOCK_TYPE_BROWN:
+                    {
+                        blocksprite = block_brown;
+                        break;
+                    }
+                    case BLOCK_TYPE_BLUE:
+                    {
+                        blocksprite = block_blue;
+                        break;
+                    }
+                    case BLOCK_TYPE_GREEN:
+                    {
+                        blocksprite = block_green;
+                        break;
+                    }
+                    case BLOCK_TYPE_GRAY:
+                    {
+                        blocksprite = block_gray;
                         break;
                     }
                 }
@@ -637,12 +672,17 @@ void playfield_generate_block(playfield_t *playfield, int x, int y, float block_
 
     if (chance() <= block_chance)
     {
-        int corner = (int)(chance() * 4.0);
-        int second = (int)(chance() * 3.0);
-
         playfield_entry_t *cur = playfield_entry(playfield, x, y);
-        cur->block = BLOCK_TYPE_PURPLE;
-        cur->pipe = bits[corner] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
+        int color = (int)(chance() * 6.0) + 1;
+        cur->block = color;
+
+        if (chance() >= 0.05)
+        {
+            int corner = (int)(chance() * 4.0);
+            int second = (int)(chance() * 3.0);
+
+            cur->pipe = bits[corner] | bits[(corner + (second > 0 ? 2 : 1)) % 4];
+        }
     }
 }
 
@@ -1089,6 +1129,52 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
     playfield_apply_gravity(playfield);
 }
 
+#define SWAP_DIRECTION_HORIZONTAL 21
+#define SWAP_DIRECTION_VERTICAL 22
+
+void playfield_cursor_swap(playfield_t *playfield, int direction)
+{
+    switch(direction)
+    {
+        case SWAP_DIRECTION_HORIZONTAL:
+        {
+            if (playfield->curx > 0 && playfield->curx < (playfield->width - 1))
+            {
+                playfield_entry_t *swap1 = playfield_entry(playfield, playfield->curx - 1, playfield->cury);
+                playfield_entry_t *swap2 = playfield_entry(playfield, playfield->curx + 1, playfield->cury);
+
+                if (swap1->block != BLOCK_TYPE_NONE && swap2->block != BLOCK_TYPE_NONE)
+                {
+                    playfield_entry_t temp;
+                    memcpy(&temp, swap1, sizeof(playfield_entry_t));
+                    memcpy(swap1, swap2, sizeof(playfield_entry_t));
+                    memcpy(swap2, &temp, sizeof(playfield_entry_t));
+                }
+            }
+            break;
+        }
+        case SWAP_DIRECTION_VERTICAL:
+        {
+            if (playfield->cury > 0 && playfield->cury < (playfield->height - 1))
+            {
+                playfield_entry_t *swap1 = playfield_entry(playfield, playfield->curx, playfield->cury + 1);
+                playfield_entry_t *swap2 = playfield_entry(playfield, playfield->curx, playfield->cury - 1);
+
+                if (swap1->block != BLOCK_TYPE_NONE && swap2->block != BLOCK_TYPE_NONE)
+                {
+                    playfield_entry_t temp;
+                    memcpy(&temp, swap1, sizeof(playfield_entry_t));
+                    memcpy(swap1, swap2, sizeof(playfield_entry_t));
+                    memcpy(swap2, &temp, sizeof(playfield_entry_t));
+                }
+            }
+            break;
+        }
+    }
+
+    playfield_check_connections(playfield);
+}
+
 #define PLAYFIELD_WIDTH 9
 #define PLAYFIELD_HEIGHT 12
 
@@ -1108,6 +1194,11 @@ void main()
     // Load sprites.
     cursor = sprite_load("rom://sprites/cursor");
     block_purple = sprite_load("rom://sprites/purpleblock");
+    block_brown = sprite_load("rom://sprites/brownblock");
+    block_blue = sprite_load("rom://sprites/blueblock");
+    block_green = sprite_load("rom://sprites/greenblock");
+    block_orange = sprite_load("rom://sprites/orangeblock");
+    block_gray = sprite_load("rom://sprites/grayblock");
 
     // Pipes
     pipe_ew = sprite_load("rom://sprites/straightpipe");
@@ -1215,6 +1306,8 @@ void main()
     // FPS calculation for debugging.
     double fps_value = 60.0;
     unsigned int draw_time = 0;
+    unsigned int allow_rotation = 0;
+    unsigned int allow_dragging = 1;
 
     // Cursor repeat tracking.
     int repeats[4] = { -1, -1, -1, -1 };
@@ -1234,33 +1327,36 @@ void main()
         int dragging = 0;
 
         // Handle drag modifier.
-        if (held.player1.button3)
+        if (allow_dragging)
         {
-            dragging = 1;
+            if (held.player1.button3)
+            {
+                dragging = 1;
 
-            if (pressed.player1.up)
-            {
-                playfield_cursor_drag(playfield, CURSOR_MOVE_UP);
+                if (pressed.player1.up)
+                {
+                    playfield_cursor_drag(playfield, CURSOR_MOVE_UP);
+                }
+                if (pressed.player1.down)
+                {
+                    playfield_cursor_drag(playfield, CURSOR_MOVE_DOWN);
+                }
+                if (pressed.player1.left)
+                {
+                    playfield_cursor_drag(playfield, CURSOR_MOVE_LEFT);
+                }
+                if (pressed.player1.right)
+                {
+                    playfield_cursor_drag(playfield, CURSOR_MOVE_RIGHT);
+                }
             }
-            if (pressed.player1.down)
+            else if(released.player1.button3)
             {
-                playfield_cursor_drag(playfield, CURSOR_MOVE_DOWN);
-            }
-            if (pressed.player1.left)
-            {
-                playfield_cursor_drag(playfield, CURSOR_MOVE_LEFT);
-            }
-            if (pressed.player1.right)
-            {
-                playfield_cursor_drag(playfield, CURSOR_MOVE_RIGHT);
-            }
-        }
-        else if(released.player1.button3)
-        {
-            // Let go of a drag, lets reset repeats.
-            for (int i = 0; i < 4; i++)
-            {
-                repeats[i] = -1;
+                // Let go of a drag, lets reset repeats.
+                for (int i = 0; i < 4; i++)
+                {
+                    repeats[i] = -1;
+                }
             }
         }
 
@@ -1303,13 +1399,28 @@ void main()
             {
                 playfield_cursor_move(playfield, CURSOR_MOVE_RIGHT);
             }
-            if (pressed.player1.button1)
+
+            if (allow_rotation)
             {
-                playfield_cursor_rotate(playfield, CURSOR_ROTATE_LEFT);
+                if (pressed.player1.button1)
+                {
+                    playfield_cursor_rotate(playfield, CURSOR_ROTATE_LEFT);
+                }
+                if (pressed.player1.button2)
+                {
+                    playfield_cursor_rotate(playfield, CURSOR_ROTATE_RIGHT);
+                }
             }
-            if (pressed.player1.button2)
+            else
             {
-                playfield_cursor_rotate(playfield, CURSOR_ROTATE_RIGHT);
+                if (pressed.player1.button1)
+                {
+                    playfield_cursor_swap(playfield, SWAP_DIRECTION_HORIZONTAL);
+                }
+                if (pressed.player1.button2)
+                {
+                    playfield_cursor_swap(playfield, SWAP_DIRECTION_VERTICAL);
+                }
             }
         }
 

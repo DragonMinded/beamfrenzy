@@ -179,31 +179,55 @@ void *pipe_ns = 0;
 void *red_ns = 0;
 void *green_ns = 0;
 void *blue_ns = 0;
+void *cyan_ns = 0;
+void *magenta_ns = 0;
+void *yellow_ns = 0;
+void *white_ns = 0;
 
 void *pipe_ew = 0;
 void *red_ew = 0;
 void *green_ew = 0;
 void *blue_ew = 0;
+void *cyan_ew = 0;
+void *magenta_ew = 0;
+void *yellow_ew = 0;
+void *white_ew = 0;
 
 void *pipe_ne = 0;
 void *red_ne = 0;
 void *green_ne = 0;
 void *blue_ne = 0;
+void *cyan_ne = 0;
+void *magenta_ne = 0;
+void *yellow_ne = 0;
+void *white_ne = 0;
 
 void *pipe_se = 0;
 void *red_se = 0;
 void *green_se = 0;
 void *blue_se = 0;
+void *cyan_se = 0;
+void *magenta_se = 0;
+void *yellow_se = 0;
+void *white_se = 0;
 
 void *pipe_nw = 0;
 void *red_nw = 0;
 void *green_nw = 0;
 void *blue_nw = 0;
+void *cyan_nw = 0;
+void *magenta_nw = 0;
+void *yellow_nw = 0;
+void *white_nw = 0;
 
 void *pipe_sw = 0;
 void *red_sw = 0;
 void *green_sw = 0;
 void *blue_sw = 0;
+void *cyan_sw = 0;
+void *magenta_sw = 0;
+void *yellow_sw = 0;
+void *white_sw = 0;
 
 void *source_n = 0;
 void *source_e = 0;
@@ -272,11 +296,6 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                         blocksprite = block_purple;
                         break;
                     }
-                    default:
-                    {
-                        // TODO: Display error sprite?
-                        break;
-                    }
                 }
 
                 void *pipesprite = 0;
@@ -298,6 +317,22 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                         {
                             colorsprite = blue_ew;
                         }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = magenta_ew;
+                        }
+                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = cyan_ew;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+                        {
+                            colorsprite = yellow_ew;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = white_ew;
+                        }
                         break;
                     }
                     case PIPE_CONN_N | PIPE_CONN_S:
@@ -314,6 +349,22 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                         if (cur->color == SOURCE_COLOR_BLUE)
                         {
                             colorsprite = blue_ns;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = magenta_ns;
+                        }
+                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = cyan_ns;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+                        {
+                            colorsprite = yellow_ns;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = white_ns;
                         }
                         break;
                     }
@@ -332,6 +383,22 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                         {
                             colorsprite = blue_ne;
                         }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = magenta_ne;
+                        }
+                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = cyan_ne;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+                        {
+                            colorsprite = yellow_ne;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = white_ne;
+                        }
                         break;
                     }
                     case PIPE_CONN_N | PIPE_CONN_W:
@@ -348,6 +415,22 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                         if (cur->color == SOURCE_COLOR_BLUE)
                         {
                             colorsprite = blue_nw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = magenta_nw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = cyan_nw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+                        {
+                            colorsprite = yellow_nw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = white_nw;
                         }
                         break;
                     }
@@ -366,6 +449,22 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                         {
                             colorsprite = blue_se;
                         }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = magenta_se;
+                        }
+                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = cyan_se;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+                        {
+                            colorsprite = yellow_se;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = white_se;
+                        }
                         break;
                     }
                     case PIPE_CONN_S | PIPE_CONN_W:
@@ -382,6 +481,22 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                         if (cur->color == SOURCE_COLOR_BLUE)
                         {
                             colorsprite = blue_sw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = magenta_sw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = cyan_sw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN))
+                        {
+                            colorsprite = yellow_sw;
+                        }
+                        if (cur->color == (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE))
+                        {
+                            colorsprite = white_sw;
                         }
                         break;
                     }
@@ -1012,6 +1127,18 @@ void main()
     blue_ew = sprite_load("rom://sprites/straightblue");
     blue_ns = sprite_dup_rotate_cw(blue_ew, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
 
+    cyan_ew = sprite_load("rom://sprites/straightcyan");
+    cyan_ns = sprite_dup_rotate_cw(cyan_ew, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    magenta_ew = sprite_load("rom://sprites/straightmagenta");
+    magenta_ns = sprite_dup_rotate_cw(magenta_ew, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    yellow_ew = sprite_load("rom://sprites/straightyellow");
+    yellow_ns = sprite_dup_rotate_cw(yellow_ew, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    white_ew = sprite_load("rom://sprites/straightwhite");
+    white_ns = sprite_dup_rotate_cw(white_ew, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
     red_sw = sprite_load("rom://sprites/cornerred");
     red_nw = sprite_dup_rotate_cw(red_sw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
     red_ne = sprite_dup_rotate_cw(red_nw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
@@ -1027,11 +1154,32 @@ void main()
     blue_ne = sprite_dup_rotate_cw(blue_nw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
     blue_se = sprite_dup_rotate_cw(blue_ne, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
 
+    cyan_sw = sprite_load("rom://sprites/cornercyan");
+    cyan_nw = sprite_dup_rotate_cw(cyan_sw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    cyan_ne = sprite_dup_rotate_cw(cyan_nw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    cyan_se = sprite_dup_rotate_cw(cyan_ne, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    magenta_sw = sprite_load("rom://sprites/cornermagenta");
+    magenta_nw = sprite_dup_rotate_cw(magenta_sw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    magenta_ne = sprite_dup_rotate_cw(magenta_nw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    magenta_se = sprite_dup_rotate_cw(magenta_ne, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    yellow_sw = sprite_load("rom://sprites/corneryellow");
+    yellow_nw = sprite_dup_rotate_cw(yellow_sw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    yellow_ne = sprite_dup_rotate_cw(yellow_nw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    yellow_se = sprite_dup_rotate_cw(yellow_ne, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    white_sw = sprite_load("rom://sprites/cornerwhite");
+    white_nw = sprite_dup_rotate_cw(white_sw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    white_ne = sprite_dup_rotate_cw(white_nw, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    white_se = sprite_dup_rotate_cw(white_ne, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
     // Sources and their associated colors
     source_e = sprite_load("rom://sprites/source");
     source_s = sprite_dup_rotate_cw(source_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
     source_w = sprite_dup_rotate_cw(source_s, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
     source_n = sprite_dup_rotate_cw(source_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
     source_red = sprite_load("rom://sprites/red");
     source_green = sprite_load("rom://sprites/green");
     source_blue = sprite_load("rom://sprites/blue");

@@ -34,10 +34,18 @@ build/romfs.bin: romfs/ ${ROMFSGEN_FILE} ${IMG2BIN_FILE}
 	${IMG2BIN} romfs/sprites/straightred assets/sprites/straightred.png --depth 16
 	${IMG2BIN} romfs/sprites/straightgreen assets/sprites/straightgreen.png --depth 16
 	${IMG2BIN} romfs/sprites/straightblue assets/sprites/straightblue.png --depth 16
+	${IMG2BIN} romfs/sprites/straightcyan assets/sprites/straightcyan.png --depth 16
+	${IMG2BIN} romfs/sprites/straightmagenta assets/sprites/straightmagenta.png --depth 16
+	${IMG2BIN} romfs/sprites/straightyellow assets/sprites/straightyellow.png --depth 16
+	${IMG2BIN} romfs/sprites/straightwhite assets/sprites/straightwhite.png --depth 16
 	${IMG2BIN} romfs/sprites/cornerpipe assets/sprites/cornerpipe.png --depth 16
-	${IMG2BIN} romfs/sprites/cornerblue assets/sprites/cornerblue.png --depth 16
-	${IMG2BIN} romfs/sprites/cornergreen assets/sprites/cornergreen.png --depth 16
 	${IMG2BIN} romfs/sprites/cornerred assets/sprites/cornerred.png --depth 16
+	${IMG2BIN} romfs/sprites/cornergreen assets/sprites/cornergreen.png --depth 16
+	${IMG2BIN} romfs/sprites/cornerblue assets/sprites/cornerblue.png --depth 16
+	${IMG2BIN} romfs/sprites/cornercyan assets/sprites/cornercyan.png --depth 16
+	${IMG2BIN} romfs/sprites/cornermagenta assets/sprites/cornermagenta.png --depth 16
+	${IMG2BIN} romfs/sprites/corneryellow assets/sprites/corneryellow.png --depth 16
+	${IMG2BIN} romfs/sprites/cornerwhite assets/sprites/cornerwhite.png --depth 16
 	${ROMFSGEN} $@ romfs/
 
 # Provide the top-level ROM creation target for this binary.

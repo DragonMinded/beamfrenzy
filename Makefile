@@ -51,6 +51,13 @@ build/romfs.bin: romfs/ ${ROMFSGEN_FILE} ${IMG2BIN_FILE}
 	${IMG2BIN} romfs/sprites/cornermagenta assets/sprites/cornermagenta.png --depth 16
 	${IMG2BIN} romfs/sprites/corneryellow assets/sprites/corneryellow.png --depth 16
 	${IMG2BIN} romfs/sprites/cornerwhite assets/sprites/cornerwhite.png --depth 16
+	${IMG2BIN} romfs/sprites/endred assets/sprites/endred.png --depth 16
+	${IMG2BIN} romfs/sprites/endgreen assets/sprites/endgreen.png --depth 16
+	${IMG2BIN} romfs/sprites/endblue assets/sprites/endblue.png --depth 16
+	${IMG2BIN} romfs/sprites/endcyan assets/sprites/endcyan.png --depth 16
+	${IMG2BIN} romfs/sprites/endmagenta assets/sprites/endmagenta.png --depth 16
+	${IMG2BIN} romfs/sprites/endyellow assets/sprites/endyellow.png --depth 16
+	${IMG2BIN} romfs/sprites/endwhite assets/sprites/endwhite.png --depth 16
 	${ROMFSGEN} $@ romfs/
 
 # Provide the top-level ROM creation target for this binary.

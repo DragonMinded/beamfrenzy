@@ -157,10 +157,9 @@ typedef struct
 #define BLOCK_TYPE_NONE 0
 #define BLOCK_TYPE_PURPLE 1
 #define BLOCK_TYPE_ORANGE 2
-#define BLOCK_TYPE_BROWN 3
-#define BLOCK_TYPE_BLUE 4
-#define BLOCK_TYPE_GREEN 5
-#define BLOCK_TYPE_GRAY 6
+#define BLOCK_TYPE_BLUE 3
+#define BLOCK_TYPE_GREEN 4
+#define BLOCK_TYPE_GRAY 5
 
 #define PIPE_CONN_NONE 0
 #define PIPE_CONN_N 0x1
@@ -180,7 +179,6 @@ void *cursor = 0;
 
 void *block_purple = 0;
 void *block_orange = 0;
-void *block_brown = 0;
 void *block_blue = 0;
 void *block_green = 0;
 void *block_gray = 0;
@@ -252,6 +250,38 @@ void *source_magenta = 0;
 void *source_yellow = 0;
 void *source_white = 0;
 
+void *red_n = 0;
+void *green_n = 0;
+void *blue_n = 0;
+void *cyan_n = 0;
+void *magenta_n = 0;
+void *yellow_n = 0;
+void *white_n = 0;
+
+void *red_s = 0;
+void *green_s = 0;
+void *blue_s = 0;
+void *cyan_s = 0;
+void *magenta_s = 0;
+void *yellow_s = 0;
+void *white_s = 0;
+
+void *red_e = 0;
+void *green_e = 0;
+void *blue_e = 0;
+void *cyan_e = 0;
+void *magenta_e = 0;
+void *yellow_e = 0;
+void *white_e = 0;
+
+void *red_w = 0;
+void *green_w = 0;
+void *blue_w = 0;
+void *cyan_w = 0;
+void *magenta_w = 0;
+void *yellow_w = 0;
+void *white_w = 0;
+
 #define PLAYFIELD_BORDER 2
 
 void playfield_metrics(playfield_t *playfield, int *width, int *height)
@@ -309,11 +339,6 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                     case BLOCK_TYPE_ORANGE:
                     {
                         blocksprite = block_orange;
-                        break;
-                    }
-                    case BLOCK_TYPE_BROWN:
-                    {
-                        blocksprite = block_brown;
                         break;
                     }
                     case BLOCK_TYPE_BLUE:
@@ -558,12 +583,55 @@ void playfield_draw(int x, int y, playfield_t *playfield)
             // Now draw sources around the edges.
             source_entry_t *source = 0;
             void *sourcesprite = 0;
+            void *pipecolorsprite = 0;
             if (pwidth == -1)
             {
                 if (pheight >= 0 && pheight < playfield->height)
                 {
                     source = playfield->sources + pheight;
                     sourcesprite = source_e;
+                    playfield_entry_t *adj = playfield_entry(playfield, 0, pheight);
+                    if (adj->pipe & PIPE_CONN_W)
+                    {
+                        switch(adj->color)
+                        {
+                            case SOURCE_COLOR_RED:
+                            {
+                                pipecolorsprite = red_e;
+                                break;
+                            }
+                            case SOURCE_COLOR_GREEN:
+                            {
+                                pipecolorsprite = green_e;
+                                break;
+                            }
+                            case SOURCE_COLOR_BLUE:
+                            {
+                                pipecolorsprite = blue_e;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = magenta_e;
+                                break;
+                            }
+                            case (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = cyan_e;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN):
+                            {
+                                pipecolorsprite = yellow_e;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = white_e;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             else if (pwidth == playfield->width)
@@ -572,6 +640,48 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                 {
                     source = playfield->sources + playfield->height + pheight;
                     sourcesprite = source_w;
+                    playfield_entry_t *adj = playfield_entry(playfield, playfield->width - 1, pheight);
+                    if (adj->pipe & PIPE_CONN_E)
+                    {
+                        switch(adj->color)
+                        {
+                            case SOURCE_COLOR_RED:
+                            {
+                                pipecolorsprite = red_w;
+                                break;
+                            }
+                            case SOURCE_COLOR_GREEN:
+                            {
+                                pipecolorsprite = green_w;
+                                break;
+                            }
+                            case SOURCE_COLOR_BLUE:
+                            {
+                                pipecolorsprite = blue_w;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = magenta_w;
+                                break;
+                            }
+                            case (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = cyan_w;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN):
+                            {
+                                pipecolorsprite = yellow_w;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = white_w;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             else if (pheight == playfield->height)
@@ -580,6 +690,48 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                 {
                     source = playfield->sources + (2 * playfield->height) + pwidth;
                     sourcesprite = source_n;
+                    playfield_entry_t *adj = playfield_entry(playfield, pwidth, playfield->height - 1);
+                    if (adj->pipe & PIPE_CONN_S)
+                    {
+                        switch(adj->color)
+                        {
+                            case SOURCE_COLOR_RED:
+                            {
+                                pipecolorsprite = red_n;
+                                break;
+                            }
+                            case SOURCE_COLOR_GREEN:
+                            {
+                                pipecolorsprite = green_n;
+                                break;
+                            }
+                            case SOURCE_COLOR_BLUE:
+                            {
+                                pipecolorsprite = blue_n;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = magenta_n;
+                                break;
+                            }
+                            case (SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = cyan_n;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN):
+                            {
+                                pipecolorsprite = yellow_n;
+                                break;
+                            }
+                            case (SOURCE_COLOR_RED | SOURCE_COLOR_GREEN | SOURCE_COLOR_BLUE):
+                            {
+                                pipecolorsprite = white_n;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -588,6 +740,10 @@ void playfield_draw(int x, int y, playfield_t *playfield)
                 if (source->color != SOURCE_COLOR_NONE)
                 {
                     video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, sourcesprite);
+                }
+                if (pipecolorsprite != 0)
+                {
+                    video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, pipecolorsprite);
                 }
 
                 switch(source->color)
@@ -673,7 +829,7 @@ void playfield_generate_block(playfield_t *playfield, int x, int y, float block_
     if (chance() <= block_chance)
     {
         playfield_entry_t *cur = playfield_entry(playfield, x, y);
-        int color = (int)(chance() * 6.0) + 1;
+        int color = (int)(chance() * 5.0) + 1;
         cur->block = color;
 
         if (chance() >= 0.05)
@@ -959,11 +1115,10 @@ void playfield_apply_gravity(playfield_t *playfield)
                     if (potential->block != BLOCK_TYPE_NONE)
                     {
                         // Drop this block in.
-                        cur->block = potential->block;
-                        cur->pipe = potential->pipe;
-
-                        potential->block = BLOCK_TYPE_NONE;
-                        potential->pipe = PIPE_CONN_NONE;
+                        playfield_entry_t temp;
+                        memcpy(&temp, potential, sizeof(playfield_entry_t));
+                        memcpy(potential, cur, sizeof(playfield_entry_t));
+                        memcpy(cur, &temp, sizeof(playfield_entry_t));
                         break;
                     }
                 }
@@ -972,6 +1127,34 @@ void playfield_apply_gravity(playfield_t *playfield)
     }
 
     playfield_check_connections(playfield);
+}
+
+#define MAX_AGE 30
+
+void playfield_age(playfield_t *playfield)
+{
+    for (int y = 0; y < playfield->height; y++)
+    {
+        for (int x = 0; x < playfield->width; x++)
+        {
+            // Kill any connections with light active that are older than
+            // some age.
+            playfield_entry_t *cur = playfield_entry(playfield, x, y);
+            if (cur->block != BLOCK_TYPE_NONE && cur->color != SOURCE_COLOR_NONE)
+            {
+                if (cur->age > MAX_AGE)
+                {
+                    memset(cur, 0, sizeof(playfield_entry_t));
+                }
+                else
+                {
+                    cur->age ++;
+                }
+            }
+        }
+    }
+
+    playfield_apply_gravity(playfield);
 }
 
 #define CURSOR_MOVE_UP 1
@@ -1194,7 +1377,6 @@ void main()
     // Load sprites.
     cursor = sprite_load("rom://sprites/cursor");
     block_purple = sprite_load("rom://sprites/purpleblock");
-    block_brown = sprite_load("rom://sprites/brownblock");
     block_blue = sprite_load("rom://sprites/blueblock");
     block_green = sprite_load("rom://sprites/greenblock");
     block_orange = sprite_load("rom://sprites/orangeblock");
@@ -1278,6 +1460,41 @@ void main()
     source_magenta = sprite_load("rom://sprites/magenta");
     source_yellow = sprite_load("rom://sprites/yellow");
     source_white = sprite_load("rom://sprites/white");
+
+    red_w = sprite_load("rom://sprites/endred");
+    red_n = sprite_dup_rotate_cw(red_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    red_e = sprite_dup_rotate_cw(red_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    red_s = sprite_dup_rotate_cw(red_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    green_w = sprite_load("rom://sprites/endgreen");
+    green_n = sprite_dup_rotate_cw(green_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    green_e = sprite_dup_rotate_cw(green_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    green_s = sprite_dup_rotate_cw(green_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    blue_w = sprite_load("rom://sprites/endblue");
+    blue_n = sprite_dup_rotate_cw(blue_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    blue_e = sprite_dup_rotate_cw(blue_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    blue_s = sprite_dup_rotate_cw(blue_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    cyan_w = sprite_load("rom://sprites/endcyan");
+    cyan_n = sprite_dup_rotate_cw(cyan_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    cyan_e = sprite_dup_rotate_cw(cyan_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    cyan_s = sprite_dup_rotate_cw(cyan_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    magenta_w = sprite_load("rom://sprites/endmagenta");
+    magenta_n = sprite_dup_rotate_cw(magenta_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    magenta_e = sprite_dup_rotate_cw(magenta_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    magenta_s = sprite_dup_rotate_cw(magenta_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    yellow_w = sprite_load("rom://sprites/endyellow");
+    yellow_n = sprite_dup_rotate_cw(yellow_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    yellow_e = sprite_dup_rotate_cw(yellow_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    yellow_s = sprite_dup_rotate_cw(yellow_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    white_w = sprite_load("rom://sprites/endwhite");
+    white_n = sprite_dup_rotate_cw(white_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    white_e = sprite_dup_rotate_cw(white_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+    white_s = sprite_dup_rotate_cw(white_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
 
     playfield_t *playfield = playfield_new(PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT);
     for (int y = 0; y < PLAYFIELD_HEIGHT; y++)
@@ -1423,6 +1640,10 @@ void main()
                 }
             }
         }
+
+        // Age the playfield so we can get rid of any beams that have stuck
+        // around too long.
+        playfield_age(playfield);
 
         // Draw the playfield
         int width;

@@ -2478,14 +2478,17 @@ void main()
         playfield_draw((video_width() - width) / 2, 24, playfield);
 
         // Draw debugging
-        video_draw_debug_text(
-            (video_width() / 2) - (18 * 4),
-            video_height() - 32,
-            rgb(0, 200, 255),
-            "FPS: %.01f, %dx%d\n  us frame: %u",
-            fps_value, video_width(), video_height(),
-            draw_time
-        );
+        if (held.player1.button6)
+        {
+            video_draw_debug_text(
+                (video_width() / 2) - (18 * 4),
+                video_height() - 32,
+                rgb(0, 200, 255),
+                "FPS: %.01f, %dx%d\n  us frame: %u",
+                fps_value, video_width(), video_height(),
+                draw_time
+            );
+        }
 
         // Calculate draw time
         draw_time = profile_end(drawprofile);

@@ -10,8 +10,11 @@ all: beamfrenzy.bin
 # these files exist.
 SRCS += main.c
 
+# Make sure to link with libxmp for music.
+LIBS += -lxmp
+
 # We want a different serial for whatever reason.
-SERIAL = BBF0
+SERIAL = BBF9
 
 # Pick up base makefile rules common to all examples.
 include ${NAOMI_BASE}/tools/Makefile.base
@@ -65,6 +68,8 @@ build/romfs.bin: romfs/ ${ROMFSGEN_FILE} ${IMG2BIN_FILE}
 	cp assets/sounds/clear.raw romfs/sounds/clear
 	cp assets/sounds/drop.raw romfs/sounds/drop
 	cp assets/sounds/scroll.raw romfs/sounds/scroll
+	mkdir -p romfs/music/
+	cp assets/music/ts*.xm romfs/music/
 	${ROMFSGEN} $@ romfs/
 
 # Provide the top-level ROM creation target for this binary.

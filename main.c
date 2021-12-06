@@ -11,6 +11,94 @@
 #include <naomi/rtc.h>
 #include <naomi/timer.h>
 #include <naomi/system.h>
+#include <xmp.h>
+
+#define BUFSIZE 8192
+#define SAMPLERATE 44100
+
+typedef struct
+{
+    char filename[1024];
+    volatile int exit;
+    volatile int error;
+    uint32_t thread;
+} audiothread_instructions_t;
+
+void *audiothread_main(void *param)
+{
+    audiothread_instructions_t *instructions = (audiothread_instructions_t *)param;
+
+    xmp_context ctx = xmp_create_context();
+
+    if (xmp_load_module(ctx, instructions->filename) < 0)
+    {
+        instructions->error = 1;
+        return 0;
+    }
+    else if (xmp_start_player(ctx, SAMPLERATE, 0) != 0)
+    {
+        instructions->error = 2;
+        xmp_release_module(ctx);
+    }
+    else
+    {
+        audio_register_ringbuffer(AUDIO_FORMAT_16BIT, SAMPLERATE, BUFSIZE);
+
+        while (xmp_play_frame(ctx) == 0 && instructions->exit == 0)
+        {
+            struct xmp_frame_info fi;
+            xmp_get_frame_info(ctx, &fi);
+
+            unsigned int numsamples = fi.buffer_size / 4;
+            uint32_t *samples = (uint32_t *)fi.buffer;
+
+            while (numsamples > 0)
+            {
+                unsigned int actual_written = audio_write_stereo_data(samples, numsamples);
+                if (actual_written < numsamples)
+                {
+                    numsamples -= actual_written;
+                    samples += actual_written;
+
+                    // Sleep for the time it takes to play half our buffer so we can wake up and
+                    // fill it again.
+                    thread_sleep((int)(1000000.0 * (((float)BUFSIZE / 4.0) / (float)SAMPLERATE)));
+                }
+                else
+                {
+                    numsamples = 0;
+                }
+            }
+        }
+
+        audio_unregister_ringbuffer();
+
+        xmp_end_player(ctx);
+        xmp_release_module(ctx);
+    }
+
+    xmp_free_context(ctx);
+    return 0;
+}
+
+audiothread_instructions_t * music_play(char *filename)
+{
+    audiothread_instructions_t *inst = malloc(sizeof(audiothread_instructions_t));
+    memset(inst, 0, sizeof(audiothread_instructions_t));
+    strcpy(inst->filename, filename);
+
+    inst->thread = thread_create("audio", &audiothread_main, inst);
+    thread_priority(inst->thread, 1);
+    thread_start(inst->thread);
+    return inst;
+}
+
+void music_stop(audiothread_instructions_t *inst)
+{
+    inst->exit = 1;
+    thread_join(inst->thread);
+    free(inst);
+}
 
 #define REPEAT_INITIAL_DELAY 500000
 #define REPEAT_SUBSEQUENT_DELAY 25000
@@ -186,6 +274,7 @@ typedef struct
     playfield_entry_t *entries;
     source_entry_t *sources;
     playfield_entry_t *upnext;
+    audiothread_instructions_t *instructions;
 } playfield_t;
 
 #define BLOCK_TYPE_NONE 0
@@ -706,14 +795,11 @@ void playfield_draw(int x, int y, playfield_t *playfield)
 
             char message[128];
             memset(message, 0, 128);
-            if (playfield->running)
+            if (playfield_game_over(playfield))
             {
-                if (playfield_game_over(playfield))
-                {
-                    strcpy(message, "Game over!");
-                }
+                strcpy(message, "Game over!");
             }
-            else
+            else if (!playfield->running)
             {
                 strcpy(message, "Press start!");
             }
@@ -788,14 +874,11 @@ void playfield_draw(int x, int y, playfield_t *playfield)
 
             char message[128];
             memset(message, 0, 128);
-            if (playfield->running)
+            if (playfield_game_over(playfield))
             {
-                if (playfield_game_over(playfield))
-                {
-                    strcpy(message, "Game over!");
-                }
+                strcpy(message, "Game over!");
             }
-            else
+            else if (!playfield->running)
             {
                 strcpy(message, "Press start!");
             }
@@ -2250,21 +2333,44 @@ void playfield_run(playfield_t *playfield)
 
     playfield->score = 0;
     playfield->running = 1;
+
+    // Choose a random audio track and start it.
+    char *audiotracks[5] = {
+        "rom://music/ts1.xm",
+        "rom://music/ts2.xm",
+        "rom://music/ts3.xm",
+        "rom://music/ts4.xm",
+        "rom://music/ts5.xm",
+    };
+
+    playfield->instructions = music_play(audiotracks[(int)(chance() * 5.0)]);
 }
 
 void playfield_stop(playfield_t *playfield)
 {
     playfield->running = 0;
+    if (playfield->instructions)
+    {
+        music_stop(playfield->instructions);
+        playfield->instructions = 0;
+    }
 }
 
 int playfield_running(playfield_t *playfield)
 {
+    if (playfield_game_over(playfield))
+    {
+        playfield_stop(playfield);
+    }
+
     if (playfield->running == 0)
     {
         return 0;
     }
-
-    return !playfield_game_over(playfield);
+    else
+    {
+        return 1;
+    }
 }
 
 void main()

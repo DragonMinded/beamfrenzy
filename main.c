@@ -181,6 +181,7 @@ typedef struct
     int cury;
     int score;
     int running;
+    int vertical;
     float timeleft;
     playfield_entry_t *entries;
     source_entry_t *sources;
@@ -326,12 +327,25 @@ int scroll_sound = -1;
 
 void playfield_metrics(playfield_t *playfield, int *width, int *height)
 {
-    *width = (playfield->width + 2) * BLOCK_WIDTH;
-    *height = (playfield->height + 2) * BLOCK_HEIGHT;
-
-    if (gamerule_placing)
+    if (playfield->vertical)
     {
-        *width += BLOCK_WIDTH * 3;
+        *width = (playfield->width + 2) * BLOCK_WIDTH;
+        *height = (playfield->height + 2) * BLOCK_HEIGHT;
+
+        if (gamerule_placing)
+        {
+            *height += BLOCK_WIDTH * 3;
+        }
+    }
+    else
+    {
+        *width = (playfield->width + 2) * BLOCK_WIDTH;
+        *height = (playfield->height + 2) * BLOCK_HEIGHT;
+
+        if (gamerule_placing)
+        {
+            *width += BLOCK_WIDTH * 3;
+        }
     }
 }
 
@@ -627,107 +641,197 @@ int playfield_game_over(playfield_t *playfield)
 
 void playfield_draw(int x, int y, playfield_t *playfield)
 {
-    video_draw_box(
-        x + BLOCK_WIDTH - PLAYFIELD_BORDER,
-        y + BLOCK_HEIGHT - PLAYFIELD_BORDER,
-        x + (BLOCK_WIDTH * (playfield->width + 1)) + (PLAYFIELD_BORDER - 1),
-        y + (BLOCK_HEIGHT * (playfield->height + 1)) + (PLAYFIELD_BORDER - 1),
-        rgb(255, 255, 255)
-    );
-    video_draw_box(
-        x + BLOCK_WIDTH - PLAYFIELD_BORDER - 1,
-        y + BLOCK_HEIGHT - PLAYFIELD_BORDER - 1,
-        x + (BLOCK_WIDTH * (playfield->width + 1)) + PLAYFIELD_BORDER,
-        y + (BLOCK_HEIGHT * (playfield->height + 1)) + PLAYFIELD_BORDER,
-        rgb(255, 255, 255)
-    );
+    int xoff = 0;
+    int yoff = 0;
 
-    if (gamerule_placing)
+    if (playfield->vertical)
     {
-        video_draw_box(
-            x + (BLOCK_WIDTH * (playfield->width + 4)) - PLAYFIELD_BORDER,
-            y + BLOCK_HEIGHT - PLAYFIELD_BORDER,
-            x + (BLOCK_WIDTH * (playfield->width + 5)) + (PLAYFIELD_BORDER - 1),
-            y + BLOCK_HEIGHT * (1 + UPNEXT_AMOUNT) + (PLAYFIELD_BORDER - 1),
-            rgb(255, 255, 255)
-        );
-        video_draw_box(
-            x + (BLOCK_WIDTH * (playfield->width + 4)) - PLAYFIELD_BORDER - 1,
-            y + BLOCK_HEIGHT - PLAYFIELD_BORDER - 1,
-            x + (BLOCK_WIDTH * (playfield->width + 5)) + (PLAYFIELD_BORDER),
-            y + BLOCK_HEIGHT * (1 + UPNEXT_AMOUNT) + (PLAYFIELD_BORDER),
-            rgb(255, 255, 255)
-        );
-
-        for (int i = 0; i < UPNEXT_AMOUNT; i++)
+        if (gamerule_placing)
         {
-            playfield_entry_t *cur = &playfield->upnext[i];
-            void *blocksprite = playfield_block_sprite(cur);
-            void *pipesprite = playfield_pipe_sprite(cur);
-            int xloc = x + (BLOCK_WIDTH * (playfield->width + 4));
-            int yloc = y + (BLOCK_HEIGHT * (i + 1));
+            yoff += BLOCK_HEIGHT * 2;
 
-            if (blocksprite != 0)
+            video_draw_box(
+                x + BLOCK_WIDTH - PLAYFIELD_BORDER,
+                y,
+                x + (BLOCK_WIDTH * (1 + UPNEXT_AMOUNT)) + (PLAYFIELD_BORDER - 1),
+                y + (BLOCK_HEIGHT) + (PLAYFIELD_BORDER + 2),
+                rgb(255, 255, 255)
+            );
+            video_draw_box(
+                x + BLOCK_WIDTH - PLAYFIELD_BORDER - 1,
+                y + 1,
+                x + (BLOCK_WIDTH * (1 + UPNEXT_AMOUNT)) + (PLAYFIELD_BORDER),
+                y + (BLOCK_HEIGHT) + (PLAYFIELD_BORDER + 3),
+                rgb(255, 255, 255)
+            );
+
+            for (int i = 0; i < UPNEXT_AMOUNT; i++)
             {
-                video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, blocksprite);
+                playfield_entry_t *cur = &playfield->upnext[i];
+                void *blocksprite = playfield_block_sprite(cur);
+                void *pipesprite = playfield_pipe_sprite(cur);
+                int xloc = x + (BLOCK_WIDTH * (i + 1));
+                int yloc = y + PLAYFIELD_BORDER + 1;
 
-                // Only draw pipes if there are blocks.
-                if (pipesprite != 0)
+                if (blocksprite != 0)
                 {
-                    video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, pipesprite);
+                    video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, blocksprite);
+
+                    // Only draw pipes if there are blocks.
+                    if (pipesprite != 0)
+                    {
+                        video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, pipesprite);
+                    }
                 }
             }
-        }
 
-        if (playfield->running && gamerule_placetimer)
-        {
-            int left = ((int)playfield->timeleft) + 1;
-            if (left > 5)
+            if (playfield->running && gamerule_placetimer)
             {
-                left = 5;
-            }
-            if (left < 0)
-            {
-                left = 0;
+                int left = ((int)playfield->timeleft) + 1;
+                if (left > 5)
+                {
+                    left = 5;
+                }
+                if (left < 0)
+                {
+                    left = 0;
+                }
+
+                video_draw_debug_text(
+                    x + 12, y + 12,
+                    rgb(255, 255, 255),
+                    "%d", left
+                );
             }
 
+            char message[128];
+            memset(message, 0, 128);
+            if (playfield->running)
+            {
+                if (playfield_game_over(playfield))
+                {
+                    strcpy(message, "Game over!");
+                }
+            }
+            else
+            {
+                strcpy(message, "Press start!");
+            }
+
+            // Draw score and such.
             video_draw_debug_text(
-                x + (BLOCK_WIDTH * (playfield->width + 3)) + 12, 24 + BLOCK_HEIGHT + 12,
+                x + xoff + BLOCK_WIDTH, y + yoff + (BLOCK_HEIGHT * (playfield->height + 2)) + 12,
                 rgb(255, 255, 255),
-                "%d", left
+                "Score: %d\n\n%s",
+                playfield->score,
+                message
             );
         }
-
-        char message[128];
-        memset(message, 0, 128);
-        if (playfield->running)
-        {
-            if (playfield_game_over(playfield))
-            {
-                strcpy(message, "Game over!");
-            }
-        }
-        else
-        {
-            strcpy(message, "Press start!");
-        }
-
-        // Draw score and such.
-        video_draw_debug_text(
-            x + (BLOCK_WIDTH * (playfield->width + 2)) + 12, y + (BLOCK_HEIGHT * (playfield->height)),
-            rgb(255, 255, 255),
-            "Score: %d\n\n%s",
-            playfield->score,
-            message
-        );
     }
+    else
+    {
+        if (gamerule_placing)
+        {
+            video_draw_box(
+                x + (BLOCK_WIDTH * (playfield->width + 4)) - PLAYFIELD_BORDER,
+                y + BLOCK_HEIGHT - PLAYFIELD_BORDER,
+                x + (BLOCK_WIDTH * (playfield->width + 5)) + (PLAYFIELD_BORDER - 1),
+                y + BLOCK_HEIGHT * (1 + UPNEXT_AMOUNT) + (PLAYFIELD_BORDER - 1),
+                rgb(255, 255, 255)
+            );
+            video_draw_box(
+                x + (BLOCK_WIDTH * (playfield->width + 4)) - PLAYFIELD_BORDER - 1,
+                y + BLOCK_HEIGHT - PLAYFIELD_BORDER - 1,
+                x + (BLOCK_WIDTH * (playfield->width + 5)) + (PLAYFIELD_BORDER),
+                y + BLOCK_HEIGHT * (1 + UPNEXT_AMOUNT) + (PLAYFIELD_BORDER),
+                rgb(255, 255, 255)
+            );
+
+            for (int i = 0; i < UPNEXT_AMOUNT; i++)
+            {
+                playfield_entry_t *cur = &playfield->upnext[i];
+                void *blocksprite = playfield_block_sprite(cur);
+                void *pipesprite = playfield_pipe_sprite(cur);
+                int xloc = x + (BLOCK_WIDTH * (playfield->width + 4));
+                int yloc = y + (BLOCK_HEIGHT * (i + 1));
+
+                if (blocksprite != 0)
+                {
+                    video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, blocksprite);
+
+                    // Only draw pipes if there are blocks.
+                    if (pipesprite != 0)
+                    {
+                        video_draw_sprite(xloc, yloc, BLOCK_WIDTH, BLOCK_HEIGHT, pipesprite);
+                    }
+                }
+            }
+
+            if (playfield->running && gamerule_placetimer)
+            {
+                int left = ((int)playfield->timeleft) + 1;
+                if (left > 5)
+                {
+                    left = 5;
+                }
+                if (left < 0)
+                {
+                    left = 0;
+                }
+
+                video_draw_debug_text(
+                    x + (BLOCK_WIDTH * (playfield->width + 3)) + 12, y + BLOCK_HEIGHT + 12,
+                    rgb(255, 255, 255),
+                    "%d", left
+                );
+            }
+
+            char message[128];
+            memset(message, 0, 128);
+            if (playfield->running)
+            {
+                if (playfield_game_over(playfield))
+                {
+                    strcpy(message, "Game over!");
+                }
+            }
+            else
+            {
+                strcpy(message, "Press start!");
+            }
+
+            // Draw score and such.
+            video_draw_debug_text(
+                x + (BLOCK_WIDTH * (playfield->width + 2)) + 12, y + (BLOCK_HEIGHT * (playfield->height)),
+                rgb(255, 255, 255),
+                "Score: %d\n\n%s",
+                playfield->score,
+                message
+            );
+        }
+    }
+
+    video_draw_box(
+        x + xoff + BLOCK_WIDTH - PLAYFIELD_BORDER,
+        y + yoff + BLOCK_HEIGHT - PLAYFIELD_BORDER,
+        x + xoff + (BLOCK_WIDTH * (playfield->width + 1)) + (PLAYFIELD_BORDER - 1),
+        y + yoff + (BLOCK_HEIGHT * (playfield->height + 1)) + (PLAYFIELD_BORDER - 1),
+        rgb(255, 255, 255)
+    );
+    video_draw_box(
+        x + xoff + BLOCK_WIDTH - PLAYFIELD_BORDER - 1,
+        y + yoff + BLOCK_HEIGHT - PLAYFIELD_BORDER - 1,
+        x + xoff + (BLOCK_WIDTH * (playfield->width + 1)) + PLAYFIELD_BORDER,
+        y + yoff + (BLOCK_HEIGHT * (playfield->height + 1)) + PLAYFIELD_BORDER,
+        rgb(255, 255, 255)
+    );
 
     for (int pheight = -1; pheight <= playfield->height; pheight++)
     {
         for (int pwidth = -1; pwidth <= playfield->width; pwidth++)
         {
-            int xloc = x + ((pwidth + 1) * BLOCK_WIDTH);
-            int yloc = y + ((pheight + 1) * BLOCK_HEIGHT);
+            int xloc = x + xoff + ((pwidth + 1) * BLOCK_WIDTH);
+            int yloc = y + yoff + ((pheight + 1) * BLOCK_HEIGHT);
 
             // First, draw the blocks on the playfield.
             if (pheight >= 0 && pheight < playfield->height && pwidth >= 0 && pwidth < playfield->width)
@@ -1035,7 +1139,7 @@ void playfield_draw(int x, int y, playfield_t *playfield)
     }
 }
 
-playfield_t *playfield_new(int width, int height)
+playfield_t *playfield_new(int vertical, int width, int height)
 {
     playfield_entry_t *entries = malloc(sizeof(playfield_entry_t) * width * height);
     memset(entries, 0, sizeof(playfield_entry_t) * width * height);
@@ -1050,6 +1154,7 @@ playfield_t *playfield_new(int width, int height)
     memset(playfield, 0, sizeof(playfield_t));
     playfield->width = width;
     playfield->height = height;
+    playfield->vertical = vertical;
     playfield->entries = entries;
     playfield->sources = sources;
     playfield->upnext = upnext;
@@ -2322,7 +2427,7 @@ void main()
     drop_sound = audio_register_sound(AUDIO_FORMAT_16BIT, 44100, drop, drop_length / 2);
     scroll_sound = audio_register_sound(AUDIO_FORMAT_16BIT, 44100, scroll, scroll_length / 2);
 
-    playfield_t *playfield = playfield_new(PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT);
+    playfield_t *playfield = playfield_new(video_is_vertical(), PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT);
 
     // FPS calculation for debugging.
     double fps_value = 60.0;
@@ -2484,7 +2589,7 @@ void main()
         playfield_draw((video_width() - width) / 2, 24, playfield);
 
         // Draw debugging
-        if (held.player1.button6)
+        if (held.player1.service || held.player2.service || held.psw2)
         {
             video_draw_debug_text(
                 (video_width() / 2) - (18 * 4),

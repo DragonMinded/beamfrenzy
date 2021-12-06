@@ -8,6 +8,7 @@
 #include <naomi/eeprom.h>
 #include <naomi/thread.h>
 #include <naomi/romfs.h>
+#include <naomi/rtc.h>
 #include <naomi/timer.h>
 
 #define REPEAT_INITIAL_DELAY 500000
@@ -67,7 +68,7 @@ float chance()
     return (float)rand() / (float)RAND_MAX;
 }
 
-void *sprite_load(const char * const path)
+void *asset_load(const char * const path, unsigned int *length)
 {
     FILE *fp = fopen(path, "rb");
     if (fp)
@@ -85,10 +86,18 @@ void *sprite_load(const char * const path)
             fread(data, 1, size, fp);
             fclose(fp);
 
+            if (length)
+            {
+                *length = size;
+            }
             return data;
         }
         else
         {
+            if (length)
+            {
+                *length = 0;
+            }
             return 0;
         }
     }
@@ -96,6 +105,11 @@ void *sprite_load(const char * const path)
     {
         return 0;
     }
+}
+
+void *sprite_load(const char * const path)
+{
+    return asset_load(path, 0);
 }
 
 void *sprite_dup_rotate_cw(void *sprite, int width, int height, int depth)
@@ -300,6 +314,12 @@ void *cyan_w = 0;
 void *magenta_w = 0;
 void *yellow_w = 0;
 void *white_w = 0;
+
+int activate_sound = -1;
+int bad_sound = -1;
+int clear_sound = -1;
+int drop_sound = -1;
+int scroll_sound = -1;
 
 #define PLAYFIELD_BORDER 2
 
@@ -658,7 +678,7 @@ void playfield_draw(int x, int y, playfield_t *playfield)
             }
         }
 
-        if (gamerule_placetimer)
+        if (playfield->running && gamerule_placetimer)
         {
             int left = ((int)playfield->timeleft) + 1;
             if (left > 5)
@@ -1026,6 +1046,7 @@ playfield_t *playfield_new(int width, int height)
     memset(upnext, 0, sizeof(playfield_entry_t) * UPNEXT_AMOUNT);
 
     playfield_t *playfield = malloc(sizeof(playfield_t));
+    memset(playfield, 0, sizeof(playfield_t));
     playfield->width = width;
     playfield->height = height;
     playfield->entries = entries;
@@ -1538,6 +1559,8 @@ void playfield_check_connections(playfield_t *playfield)
     }
 
     // Now, for anything that changed, reset its age.
+    int activated = 0;
+    int wrong = 0;
     for (int y = 0; y < playfield->height; y++)
     {
         for (int x = 0; x < playfield->width; x++)
@@ -1548,9 +1571,26 @@ void playfield_check_connections(playfield_t *playfield)
 
             if (cur->color != old->color)
             {
+                if (cur->color == SOURCE_COLOR_IMPOSSIBLE)
+                {
+                    wrong = 1;
+                }
+                else if (cur->color != SOURCE_COLOR_NONE)
+                {
+                    activated = 1;
+                }
                 cur->age = 0;
             }
         }
+    }
+
+    if (activated)
+    {
+        audio_play_registered_sound(activate_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 1.0);
+    }
+    if (wrong)
+    {
+        audio_play_registered_sound(bad_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 1.0);
     }
 
     // Now that we don't need the old entries, free them.
@@ -1576,6 +1616,7 @@ void playfield_cursor_rotate(playfield_t *playfield, int direction)
                 new_rotation |= (cur->pipe & PIPE_CONN_S) ? PIPE_CONN_E : 0;
                 new_rotation |= (cur->pipe & PIPE_CONN_W) ? PIPE_CONN_S : 0;
                 cur->pipe = new_rotation;
+                audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
             }
 
             break;
@@ -1592,6 +1633,7 @@ void playfield_cursor_rotate(playfield_t *playfield, int direction)
                 new_rotation |= (cur->pipe & PIPE_CONN_S) ? PIPE_CONN_W : 0;
                 new_rotation |= (cur->pipe & PIPE_CONN_W) ? PIPE_CONN_N : 0;
                 cur->pipe = new_rotation;
+                audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
             }
 
             break;
@@ -1638,6 +1680,7 @@ void playfield_apply_gravity(playfield_t *playfield)
 void playfield_age(playfield_t *playfield)
 {
     static int mult[8] = {0, 1, 1, 2, 1, 2, 2, 4};
+    int cleared = 0;
 
     for (int y = 0; y < playfield->height; y++)
     {
@@ -1656,6 +1699,7 @@ void playfield_age(playfield_t *playfield)
                     }
                     else
                     {
+                        cleared = 1;
                         playfield->score += mult[cur->color & 7] * 5;
                     }
 
@@ -1667,6 +1711,11 @@ void playfield_age(playfield_t *playfield)
                 }
             }
         }
+    }
+
+    if (cleared)
+    {
+        audio_play_registered_sound(clear_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 1.0);
     }
 
     if (gamerule_gravity)
@@ -1698,6 +1747,7 @@ void playfield_cursor_move(playfield_t *playfield, int direction)
             if (playfield->cury > 0)
             {
                 playfield->cury--;
+                audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
             }
             break;
         }
@@ -1706,6 +1756,7 @@ void playfield_cursor_move(playfield_t *playfield, int direction)
             if (playfield->cury < (playfield->height - 1))
             {
                 playfield->cury++;
+                audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
             }
             break;
         }
@@ -1714,6 +1765,7 @@ void playfield_cursor_move(playfield_t *playfield, int direction)
             if (playfield->curx > 0)
             {
                 playfield->curx--;
+                audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
             }
             break;
         }
@@ -1722,6 +1774,7 @@ void playfield_cursor_move(playfield_t *playfield, int direction)
             if (playfield->curx < (playfield->width - 1))
             {
                 playfield->curx++;
+                audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
             }
             break;
         }
@@ -1746,6 +1799,7 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                     memcpy(cur, swap, sizeof(playfield_entry_t));
                     memcpy(swap, &temp, sizeof(playfield_entry_t));
                     playfield->cury--;
+                    audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                 }
             }
             break;
@@ -1764,6 +1818,7 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                     memcpy(cur, swap, sizeof(playfield_entry_t));
                     memcpy(swap, &temp, sizeof(playfield_entry_t));
                     playfield->cury++;
+                    audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                 }
             }
             break;
@@ -1799,6 +1854,7 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                         memcpy(&temp, cur, sizeof(playfield_entry_t));
                         memcpy(cur, swap, sizeof(playfield_entry_t));
                         memcpy(swap, &temp, sizeof(playfield_entry_t));
+                        audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                     }
                 }
                 else
@@ -1810,6 +1866,7 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                         memcpy(cur, swap, sizeof(playfield_entry_t));
                         memcpy(swap, &temp, sizeof(playfield_entry_t));
                         playfield->cury++;
+                        audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                     }
                 }
             }
@@ -1846,6 +1903,7 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                         memcpy(&temp, cur, sizeof(playfield_entry_t));
                         memcpy(cur, swap, sizeof(playfield_entry_t));
                         memcpy(swap, &temp, sizeof(playfield_entry_t));
+                        audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                     }
                 }
                 else
@@ -1857,6 +1915,7 @@ void playfield_cursor_drag(playfield_t *playfield, int direction)
                         memcpy(cur, swap, sizeof(playfield_entry_t));
                         memcpy(swap, &temp, sizeof(playfield_entry_t));
                         playfield->cury++;
+                        audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                     }
                 }
             }
@@ -1894,6 +1953,7 @@ void playfield_cursor_swap(playfield_t *playfield, int direction)
                     memcpy(&temp, swap1, sizeof(playfield_entry_t));
                     memcpy(swap1, swap2, sizeof(playfield_entry_t));
                     memcpy(swap2, &temp, sizeof(playfield_entry_t));
+                    audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                 }
             }
             break;
@@ -1911,6 +1971,7 @@ void playfield_cursor_swap(playfield_t *playfield, int direction)
                     memcpy(&temp, swap1, sizeof(playfield_entry_t));
                     memcpy(swap1, swap2, sizeof(playfield_entry_t));
                     memcpy(swap2, &temp, sizeof(playfield_entry_t));
+                    audio_play_registered_sound(scroll_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 0.8);
                 }
             }
             break;
@@ -1928,6 +1989,7 @@ int playfield_cursor_drop(playfield_t *playfield)
     {
         // Assign the block to the actual playfield.
         memcpy(cur, playfield->upnext, sizeof(playfield_entry_t));
+        audio_play_registered_sound(drop_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 1.0);
 
         // Prepare the next upnext block.
         memmove(&playfield->upnext[0], &playfield->upnext[1], sizeof(playfield_entry_t) * (UPNEXT_AMOUNT - 1));
@@ -1998,6 +2060,7 @@ void playfield_drop_anywhere(playfield_t *playfield)
                             {
                                 // Assign the block to the actual playfield.
                                 memcpy(cur, playfield->upnext, sizeof(playfield_entry_t));
+                                audio_play_registered_sound(drop_sound, SPEAKER_LEFT | SPEAKER_RIGHT, 1.0);
 
                                 // Prepare the next upnext block.
                                 memmove(&playfield->upnext[0], &playfield->upnext[1], sizeof(playfield_entry_t) * (UPNEXT_AMOUNT - 1));
@@ -2100,6 +2163,9 @@ int playfield_running(playfield_t *playfield)
 
 void main()
 {
+    // Make sure we have truer random.
+    srand(rtc_get());
+
     // Get settings so we know how many controls to read.
     eeprom_t settings;
     eeprom_read(&settings);
@@ -2234,6 +2300,26 @@ void main()
     white_n = sprite_dup_rotate_cw(white_w, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
     white_e = sprite_dup_rotate_cw(white_n, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
     white_s = sprite_dup_rotate_cw(white_e, BLOCK_WIDTH, BLOCK_HEIGHT, 16);
+
+    // Load sound effects.
+    unsigned int activate_length;
+    void *activate = asset_load("rom://sounds/activate", &activate_length);
+    unsigned int bad_length;
+    void *bad = asset_load("rom://sounds/bad", &bad_length);
+    unsigned int clear_length;
+    void *clear = asset_load("rom://sounds/clear", &clear_length);
+    unsigned int drop_length;
+    void *drop = asset_load("rom://sounds/drop", &drop_length);
+    unsigned int scroll_length;
+    void *scroll = asset_load("rom://sounds/scroll", &scroll_length);
+
+    // Register sounds to be played whenever.
+    audio_init();
+    activate_sound = audio_register_sound(AUDIO_FORMAT_16BIT, 44100, activate, activate_length / 2);
+    bad_sound = audio_register_sound(AUDIO_FORMAT_16BIT, 44100, bad, bad_length / 2);
+    clear_sound = audio_register_sound(AUDIO_FORMAT_16BIT, 44100, clear, clear_length / 2);
+    drop_sound = audio_register_sound(AUDIO_FORMAT_16BIT, 44100, drop, drop_length / 2);
+    scroll_sound = audio_register_sound(AUDIO_FORMAT_16BIT, 44100, scroll, scroll_length / 2);
 
     playfield_t *playfield = playfield_new(PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT);
 

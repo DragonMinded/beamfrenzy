@@ -59,6 +59,12 @@ build/romfs.bin: romfs/ ${ROMFSGEN_FILE} ${IMG2BIN_FILE}
 	${IMG2BIN} romfs/sprites/endmagenta assets/sprites/endmagenta.png --depth 16
 	${IMG2BIN} romfs/sprites/endyellow assets/sprites/endyellow.png --depth 16
 	${IMG2BIN} romfs/sprites/endwhite assets/sprites/endwhite.png --depth 16
+	mkdir -p romfs/sounds/
+	cp assets/sounds/activate.raw romfs/sounds/activate
+	cp assets/sounds/bad.raw romfs/sounds/bad
+	cp assets/sounds/clear.raw romfs/sounds/clear
+	cp assets/sounds/drop.raw romfs/sounds/drop
+	cp assets/sounds/scroll.raw romfs/sounds/scroll
 	${ROMFSGEN} $@ romfs/
 
 # Provide the top-level ROM creation target for this binary.

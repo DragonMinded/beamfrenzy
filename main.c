@@ -10,6 +10,7 @@
 #include <naomi/romfs.h>
 #include <naomi/rtc.h>
 #include <naomi/timer.h>
+#include <naomi/system.h>
 
 #define REPEAT_INITIAL_DELAY 500000
 #define REPEAT_SUBSEQUENT_DELAY 25000
@@ -2344,6 +2345,11 @@ void main()
         jvs_buttons_t released = maple_buttons_released();
         int dragging = 0;
 
+        if (pressed.test || pressed.psw1)
+        {
+            enter_test_mode();
+        }
+
         if (playfield_running(playfield))
         {
             // Handle drag modifier.
@@ -2508,14 +2514,43 @@ void main()
     }
 }
 
+#define CREDITS_LINES 9
+
 void test()
 {
     video_init(VIDEO_COLOR_1555);
+    video_set_background_color(rgb(0, 0, 0));
 
     while ( 1 )
     {
-        video_fill_screen(rgb(48, 48, 48));
-        video_draw_debug_text(320 - 56, 236, rgb(255, 255, 255), "test mode stub");
+        maple_poll_buttons();
+        jvs_buttons_t pressed = maple_buttons_pressed();
+
+        // Exit back to system menu on test pressed.
+        if (pressed.test || pressed.psw1)
+        {
+            enter_test_mode();
+        }
+
+        char *lines[CREDITS_LINES] = {
+            "Beam Frenzy",
+            "Idea and code by DragonMinded",
+            "",
+            "You are free to use, play, remix or redistribute",
+            "this for non-commercial purposes only!",
+            "",
+            "Happy homebrewing!",
+            "",
+            "press [test] to exit",
+        };
+
+        for (int i = 0; i < CREDITS_LINES; i++)
+        {
+            int len = strlen(lines[i]);
+
+            video_draw_debug_text((video_width() - (len * 8)) / 2, (i * 8) + ((video_height() - (CREDITS_LINES * 8)) / 2), rgb(255, 255, 255), lines[i]);
+        }
+
         video_display_on_vblank();
     }
 }

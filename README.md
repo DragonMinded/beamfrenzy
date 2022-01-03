@@ -5,7 +5,7 @@ A quick weekend game jam block puzzle game where you connect light between vario
 
 Note that this runs on the SEGA Naomi arcade platform. To play this, download a recent version of Demul which has Naomi support and run `beamfrenzy.bin` or net boot it onto your Naomi and play on target. It supports only one player and uses only one button and one digital joystick. It contains layouts for both horizontal and vertical orientiations so feel free to play it on a cabinet running in either configuration.
 
-To compile, make sure you have a build environment set up as detailed in https://github.com/DragonMinded/netboot/tree/trunk/homebrew. Contains no external dependencies aside from what 3rd party libraries are compiled with libnaomi.
+To compile, make sure you have a build environment set up as detailed in https://github.com/DragonMinded/libnaomi. Contains no external dependencies aside from what 3rd party libraries are compiled with libnaomi.
 
 Credits
 =======
